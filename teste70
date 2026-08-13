@@ -1,0 +1,2372 @@
+-- Variables
+local Game = game
+local Tick = tick
+local Env = getgenv()
+
+local LoadStart = Tick()
+
+local GetPropertyChangedSignal = Game.GetPropertyChangedSignal
+local FindFirstChildOfClass = Game.FindFirstChildOfClass
+local FindFirstChild = Game.FindFirstChild
+local WaitForChild = Game.WaitForChild
+local GetChildren = Game.GetChildren
+local GetService = Game.GetService
+local Destroy = Game.Destroy
+
+local PointToWorldSpace = CFrame.new().PointToWorldSpace
+local PointToObjectSpace = CFrame.new().PointToObjectSpace
+local Dot = Vector3.new().Dot
+
+local FireServer = Instance.new("RemoteEvent").FireServer
+local InvokeServer = Instance.new("RemoteFunction").InvokeServer
+
+local NewInstance = Instance.new
+local NewVector3 = Vector3.new
+local NewVector2 = Vector2.new
+local NewCFrame = CFrame.new
+local NewUDim2 = UDim2.new
+local NewRGB = Color3.fromRGB
+
+local Traceback = debug.traceback
+local Wrap = coroutine.wrap
+
+local Format = string.format
+local Lower = string.lower
+local SFind = string.find
+local GSub = string.gsub
+local Char = string.char
+local Rep = string.rep
+
+local Insert = table.insert
+local Remove = table.remove
+local Unpack = table.unpack
+local Concat = table.concat
+local Create = table.create
+local Clear = table.clear
+local Sort = table.sort
+local Move = table.move
+
+local Delay = task.delay
+local Wait = task.wait
+
+local Random = math.random
+local Floor = math.floor
+local Clamp = math.clamp
+local Atan2 = math.atan2
+local Atan = math.atan
+local Acos = math.acos
+local Sqrt = math.sqrt
+local Huge = math.huge
+local Exp = math.exp
+local Cos = math.cos
+local Sin = math.sin
+local Max = math.max
+local Min = math.min
+local Abs = math.abs
+local Rad = math.rad
+local Tan = math.tan
+local Deg = math.deg
+local Pi = math.pi
+
+local Infinite = 1 / 0
+local ToDeg = 180 / Pi
+local ToRad = Pi / 180
+local TwoPi = Pi * 2
+
+-- Services
+local ReplicatedStorage = GetService(Game, "ReplicatedStorage")
+local UserInputService = GetService(Game, "UserInputService")
+local RunService = GetService(Game, "RunService")
+local Workspace = GetService(Game, "Workspace")
+local Lighting = GetService(Game, "Lighting")
+local Players = GetService(Game, "Players")
+local Stats = GetService(Game, "Stats")
+
+local RenderStepped = RunService.RenderStepped
+local Stepped = RunService.Stepped
+
+local CurrentCamera = Workspace.CurrentCamera
+local ScreenSize = CurrentCamera.ViewportSize
+local ScreenSizeX = ScreenSize.X
+local ScreenSizeY = ScreenSize.Y
+local Raycast = Workspace.Raycast
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerAdded = Players.PlayerAdded
+local PlayerRemoved = Players.PlayerRemoving
+
+local PingStat = Stats.PerformanceStats.Ping
+local GetValue = PingStat.GetValue
+local Ping = 0
+
+Stepped:Connect(function()
+    Ping = GetValue(PingStat) / 1000
+end)
+
+-- Libraries
+local Menu, Flags = loadstring(readfile("Skeet/Menu.lua"))():Load({
+    CheatName  = "Skeet",
+    CheatGame  = "Universal",
+    CheatUser  = "???",
+    Parent     = gethui(),
+    ZIndex     = 1000,
+
+    Window = {
+        Position    = NewUDim2(0.5, 0, 0.5, 0),
+        Size        = NewUDim2(0, 660, 0, 560),
+
+        Tabs = {
+            {"Rage"},
+            {"AA"},
+            {"Legit"},
+            {"Visuals"},
+            {"Misc"},
+            {"Skins"},
+            {"Players"},
+            {"Config", Open = true}
+        }
+    },
+
+    Theme = {
+        ["Accent"] = NewRGB(150, 200, 60),
+        ["Risky"] = NewRGB(182, 182, 101)
+    }
+}) Menu:CreateNotification({Text = "initializing...", LifeTime = 5, Priority = 100})
+
+local Draw = Menu.Draw
+
+local Camera      = {}
+local Mathematics = {}
+
+local LInfo     = {}
+local Info      = {}
+local Fonts     = {}
+
+local Legit    = {Loaded = false}
+local Esp      = {Loaded = false}
+local Visuals  = {Loaded = false}
+
+local BodyPartNames, BodyPartList, BodyPartSizes = {
+    "Head",
+    "Torso",
+    "Right Arm",
+    "Left Arm",
+    "Right Leg",
+    "Left Leg"
+}, {
+    ["Head"] = true,
+    ["Torso"] = true,
+    ["Right Arm"] = true,
+    ["Left Arm"] = true,
+    ["Right Leg"] = true,
+    ["Left Leg"] = true
+}, {
+    ["Head"] = NewVector3(2, 1, 1),
+    ["Torso"] = NewVector3(2, 2, 1),
+    ["Left Arm"] = NewVector3(1, 2, 1),
+    ["Right Arm"] = NewVector3(1, 2, 1),
+    ["Left Leg"] = NewVector3(1, 2, 1),
+    ["Right Leg"] = NewVector3(1, 2, 1)
+}
+
+local SkeletonJoints, SkeletonOffsetsA, SkeletonOffsetsB = {
+    { "Head", "Torso" },
+    { "Torso", "Left Arm" },
+    { "Torso", "Right Arm" },
+    { "Torso", "Left Leg" },
+    { "Torso", "Right Leg" },
+    { "Left Arm", "Left Arm" },
+    { "Right Arm", "Right Arm" },
+    { "Left Leg", "Left Leg" },
+    { "Right Leg", "Right Leg" }
+}, {
+    [1] = NewVector3(0, 0, 0),
+    [2] = NewVector3(0, 0.5, 0),
+    [3] = NewVector3(0, 0.5, 0),
+    [4] = NewVector3(0, -0.5, 0),
+    [5] = NewVector3(0, -0.5, 0),
+    [6] = NewVector3(0, 0.5, 0),
+    [7] = NewVector3(0, 0.5, 0),
+    [8] = NewVector3(0, 0.5, 0),
+    [9] = NewVector3(0, 0.5, 0)
+}, {
+    [1] = NewVector3(0, -0.5, 0),
+    [2] = NewVector3(0, 0.5, 0),
+    [3] = NewVector3(0, 0.5, 0),
+    [4] = NewVector3(0, 0.5, 0),
+    [5] = NewVector3(0, 0.5, 0),
+    [6] = NewVector3(0, -0.5, 0),
+    [7] = NewVector3(0, -0.5, 0),
+    [8] = NewVector3(0, -0.5, 0),
+    [9] = NewVector3(0, -0.5, 0)
+}
+
+local ForceFieldAnimations = {
+    ["Off"] = "rbxassetid://0",
+    ["Web"] = "rbxassetid://301464986",
+    ["Webbed"] = "rbxassetid://2179243880",
+    ["Scanning"] = "rbxassetid://5843010904",
+    ["Pixelated"] = "rbxassetid://140652787",
+    ["Swirl"] = "rbxassetid://8133639623",
+    ["Checkerboard"] = "rbxassetid://5790215150",
+    ["Christmas"] = "rbxassetid://6853532738",
+    ["Player"] = "rbxassetid://4494641460",
+    ["Shield"] = "rbxassetid://361073795",
+    ["Dots"] = "rbxassetid://5830615971",
+    ["Bubbles"] = "rbxassetid://1461576423",
+    ["Matrix"] = "rbxassetid://10713189068",
+    ["Honeycomb"] = "rbxassetid://179898251",
+    ["Groove"] = "rbxassetid://10785404176",
+    ["Cloud"] = "rbxassetid://5176277457",
+    ["Sky"] = "rbxassetid://1494603972",
+    ["Smudge"] = "rbxassetid://6096634060",
+    ["Scrapes"] = "rbxassetid://6248583558",
+    ["Galaxy"] = "rbxassetid://1120738433",
+    ["Galaxies"] = "rbxassetid://5101923607",
+    ["Stars"] = "rbxassetid://598201818",
+    ["Rainbow"] = "rbxassetid://10037165803",
+    ["Wires"] = "rbxassetid://14127933",
+    ["Camo"] = "rbxassetid://3280937154",
+    ["Hexagon"] = "rbxassetid://6175083785",
+    ["Particles"] = "rbxassetid://1133822388",
+    ["Triangular"] = "rbxassetid://4504368932",
+    ["Wall"] = "rbxassetid://4271279"
+}
+
+-- ============================================================
+-- BULLET TRACERS & HIT EFFECTS SYSTEM
+-- ============================================================
+local TracerSystem = {}
+local HitEffectSystem = {}
+
+do
+    local TracerPool   = {}
+    local TracerActive = {}
+
+    local TRACER_LIFETIME    = 0.35
+    local TRACER_FADE_TIME   = 0.25
+    local TRACER_THICKNESS   = 0.08
+    local TRACER_LIGHT_RANGE = 20
+    local TRACER_LIGHT_BRIGHT= 2
+
+    local function GetTracerPart()
+        if #TracerPool > 0 then
+            return Remove(TracerPool)
+        end
+        local Part = NewInstance("Part")
+        Part.Anchored      = true
+        Part.CanCollide    = false
+        Part.CanTouch      = false
+        Part.CastShadow    = false
+        Part.Locked        = true
+        Part.Material      = Enum.Material.Neon
+        Part.Shape         = Enum.PartType.Cylinder
+        Part.Size          = NewVector3(1, TRACER_THICKNESS, TRACER_THICKNESS)
+        Part.Parent        = Workspace
+        local Light = NewInstance("PointLight")
+        Light.Brightness   = TRACER_LIGHT_BRIGHT
+        Light.Range        = TRACER_LIGHT_RANGE
+        Light.Shadows      = false
+        Light.Parent       = Part
+        return Part
+    end
+
+    local function ReturnTracerPart(Part)
+        Part.Transparency = 1
+        Part.Size         = NewVector3(0.01, 0.01, 0.01)
+        local Light = FindFirstChildOfClass(Part, "PointLight")
+        if Light then Light.Enabled = false end
+        Insert(TracerPool, Part)
+    end
+
+    function TracerSystem.Spawn(Origin, Impact, Color)
+        if not Flags["visuals bullet tracers enabled"] then return end
+        if not Flags["visuals bullet tracers enabled"].Value then return end
+
+        local TracerColor = Color or (Flags["visuals bullet tracers color"] and Flags["visuals bullet tracers color"].Color) or NewRGB(255, 100, 50)
+
+        local Part = GetTracerPart()
+        local Direction   = Impact - Origin
+        local Length      = Direction.Magnitude
+        local MidPoint    = Origin + Direction * 0.5
+        local Thickness   = (Flags["visuals bullet tracers thickness"] and Flags["visuals bullet tracers thickness"].Value or 6) / 100
+
+        Part.Size         = NewVector3(Length, Thickness, Thickness)
+        Part.CFrame       = NewCFrame(MidPoint, Impact) * CFrame.Angles(0, math.pi / 2, 0)
+        Part.Color        = TracerColor
+        Part.Transparency = 0.1
+        Part.Parent       = Workspace
+
+        local Light = FindFirstChildOfClass(Part, "PointLight")
+        if Light then
+            Light.Color     = TracerColor
+            Light.Enabled   = true
+            Light.Brightness = TRACER_LIGHT_BRIGHT
+            Light.Range      = TRACER_LIGHT_RANGE
+        end
+
+        local Entry = {Part = Part, SpawnTime = Tick(), Lifetime = TRACER_LIFETIME, FadeTime = TRACER_FADE_TIME}
+        Insert(TracerActive, Entry)
+    end
+
+    local Tracer2DLines = {}
+
+    function TracerSystem.Spawn2D(Origin, Impact, Color)
+        if not Flags["visuals bullet tracers enabled"] then return end
+        if not Flags["visuals bullet tracers enabled"].Value then return end
+        if not Flags["visuals bullet tracers 2d overlay"] then return end
+        if not Flags["visuals bullet tracers 2d overlay"].Value then return end
+
+        local TracerColor = Color or (Flags["visuals bullet tracers color"] and Flags["visuals bullet tracers color"].Color) or NewRGB(255, 100, 50)
+
+        local OriginScreen, OriginOnScreen = Camera.WorldToViewportPoint(Origin, false)
+        local ImpactScreen, ImpactOnScreen = Camera.WorldToViewportPoint(Impact, false)
+
+        if OriginScreen.Z <= 0 and ImpactScreen.Z <= 0 then return end
+
+        local AX = OriginScreen.X
+        local AY = OriginScreen.Y
+        local BX = ImpactScreen.X
+        local BY = ImpactScreen.Y
+
+        local DX = BX - AX
+        local DY = BY - AY
+        local Len = Sqrt(DX * DX + DY * DY)
+        if Len < 1 then return end
+
+        local Cx = (AX + BX) / 2
+        local Cy = (AY + BY) / 2
+
+        local Line = NewInstance("Frame")
+        Line.AnchorPoint         = NewVector2(0.5, 0.5)
+        Line.BorderSizePixel     = 0
+        Line.BackgroundColor3    = TracerColor
+        Line.BackgroundTransparency = 0
+        Line.Size                = NewUDim2(0, Len, 0, 1)
+        Line.Position            = NewUDim2(0, Cx, 0, Cy)
+        Line.Rotation            = Deg(Atan2(DY, DX))
+        Line.Parent              = Menu.Overlay
+        Line.ZIndex              = 500
+
+        local Glow = NewInstance("UIGradient")
+        Glow.Rotation    = 0
+        Glow.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,   0),
+            NumberSequenceKeypoint.new(0.5, 0.4),
+            NumberSequenceKeypoint.new(1,   0),
+        })
+        Glow.Parent = Line
+
+        Insert(Tracer2DLines, {Frame = Line, SpawnTime = Tick(), Lifetime = TRACER_LIFETIME, FadeTime = TRACER_FADE_TIME})
+    end
+
+    function TracerSystem.Step()
+        local Now = Tick()
+
+        for i = #TracerActive, 1, -1 do
+            local Entry = TracerActive[i]
+            local Age   = Now - Entry.SpawnTime
+
+            if Age >= Entry.Lifetime then
+                local FadeAge = Age - Entry.Lifetime
+                local Alpha   = Clamp(FadeAge / Entry.FadeTime, 0, 1)
+
+                Entry.Part.Transparency = Alpha
+                local Light = FindFirstChildOfClass(Entry.Part, "PointLight")
+                if Light then Light.Brightness = TRACER_LIGHT_BRIGHT * (1 - Alpha) end
+
+                if Alpha >= 1 then
+                    ReturnTracerPart(Entry.Part)
+                    Remove(TracerActive, i)
+                end
+            end
+        end
+
+        for i = #Tracer2DLines, 1, -1 do
+            local Entry = Tracer2DLines[i]
+            local Age   = Now - Entry.SpawnTime
+
+            if Age >= Entry.Lifetime then
+                local FadeAge = Age - Entry.Lifetime
+                local Alpha   = Clamp(FadeAge / Entry.FadeTime, 0, 1)
+                Entry.Frame.BackgroundTransparency = Alpha
+                if Alpha >= 1 then
+                    Destroy(Entry.Frame)
+                    Remove(Tracer2DLines, i)
+                end
+            end
+        end
+    end
+
+    local HitActive = {}
+    local HIT_EFFECT_DURATION = 0.4
+
+    function HitEffectSystem.Spawn(HitPosition, HitInstance)
+        if not Flags["visuals hit effects enabled"] then return end
+        if not Flags["visuals hit effects enabled"].Value then return end
+
+        local HitColor = (Flags["visuals hit effects color"] and Flags["visuals hit effects color"].Color) or NewRGB(255, 30, 30)
+        local HitSize  = (Flags["visuals hit effects size"] and Flags["visuals hit effects size"].Value or 50)
+
+        local LightPart = NewInstance("Part")
+        LightPart.Anchored    = true
+        LightPart.CanCollide  = false
+        LightPart.CanTouch    = false
+        LightPart.Transparency = 1
+        LightPart.Size        = NewVector3(0.1, 0.1, 0.1)
+        LightPart.Position    = HitPosition
+        LightPart.Parent      = Workspace
+
+        local Burst = NewInstance("PointLight")
+        Burst.Color      = HitColor
+        Burst.Range      = 15
+        Burst.Brightness = 5
+        Burst.Shadows    = false
+        Burst.Parent     = LightPart
+
+        local ScreenPos, OnScreen = Camera.WorldToViewportPoint(HitPosition, true)
+        local RingFrame = nil
+
+        if OnScreen or ScreenPos.Z > 0 then
+            local StartSize = HitSize * 0.5
+
+            local Outer = NewInstance("Frame")
+            Outer.AnchorPoint       = NewVector2(0.5, 0.5)
+            Outer.BackgroundTransparency = 1
+            Outer.BorderSizePixel   = 0
+            Outer.Size              = NewUDim2(0, StartSize, 0, StartSize)
+            Outer.Position          = NewUDim2(0, ScreenPos.X, 0, ScreenPos.Y)
+            Outer.ZIndex            = 600
+            Outer.Parent            = Menu.Overlay
+
+            local Ring = NewInstance("UIStroke")
+            Ring.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            Ring.Color           = HitColor
+            Ring.Transparency    = 0
+            Ring.Thickness       = 2
+            Ring.Parent          = Outer
+
+            local Corner = NewInstance("UICorner")
+            Corner.CornerRadius = UDim.new(1, 0)
+            Corner.Parent       = Outer
+
+            local Dot = NewInstance("Frame")
+            Dot.AnchorPoint          = NewVector2(0.5, 0.5)
+            Dot.BackgroundColor3     = HitColor
+            Dot.BackgroundTransparency = 0.3
+            Dot.BorderSizePixel      = 0
+            Dot.Size                 = NewUDim2(0, StartSize * 0.3, 0, StartSize * 0.3)
+            Dot.Position             = NewUDim2(0.5, 0, 0.5, 0)
+            Dot.ZIndex               = 601
+            Dot.Parent               = Outer
+
+            local DotCorner = NewInstance("UICorner")
+            DotCorner.CornerRadius = UDim.new(1, 0)
+            DotCorner.Parent       = Dot
+
+            RingFrame = {Outer = Outer, Ring = Ring, Dot = Dot, StartSize = StartSize, HitSize = HitSize}
+        end
+
+        local DmgLabel = nil
+        if Flags["visuals hit effects damage numbers"] and Flags["visuals hit effects damage numbers"].Value then
+            if OnScreen or (ScreenPos.Z and ScreenPos.Z > 0) then
+                local Label = NewInstance("TextLabel")
+                Label.AnchorPoint       = NewVector2(0.5, 0.5)
+                Label.BackgroundTransparency = 1
+                Label.TextColor3        = HitColor
+                Label.TextStrokeColor3  = NewRGB(0, 0, 0)
+                Label.TextStrokeTransparency = 0.4
+                Label.FontFace          = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+                Label.TextSize          = 14
+                Label.Text              = "HIT"
+                Label.Position          = NewUDim2(0, ScreenPos.X, 0, ScreenPos.Y - HitSize * 0.5 - 8)
+                Label.Size              = NewUDim2(0, 60, 0, 16)
+                Label.ZIndex            = 602
+                Label.Parent            = Menu.Overlay
+                DmgLabel = Label
+            end
+        end
+
+        Insert(HitActive, {
+            SpawnTime  = Tick(),
+            Duration   = HIT_EFFECT_DURATION,
+            LightPart  = LightPart,
+            Burst      = Burst,
+            RingFrame  = RingFrame,
+            DmgLabel   = DmgLabel,
+            HitPosition = HitPosition,
+        })
+    end
+
+    function HitEffectSystem.Step()
+        local Now = Tick()
+
+        for i = #HitActive, 1, -1 do
+            local Entry  = HitActive[i]
+            local Age    = Now - Entry.SpawnTime
+            local Alpha  = Clamp(Age / Entry.Duration, 0, 1)
+            local InvAlpha = 1 - Alpha
+
+            if Entry.Burst then
+                Entry.Burst.Brightness = 5 * InvAlpha
+            end
+
+            if Entry.RingFrame then
+                local RF = Entry.RingFrame
+                local CurrentSize = RF.StartSize + (RF.HitSize - RF.StartSize) * Alpha
+                RF.Outer.Size = NewUDim2(0, CurrentSize, 0, CurrentSize)
+                RF.Ring.Transparency  = Alpha
+                RF.Dot.BackgroundTransparency = 0.3 + 0.7 * Alpha
+
+                local ScreenPos, OnScreen = Camera.WorldToViewportPoint(Entry.HitPosition, true)
+                if OnScreen or (ScreenPos.Z and ScreenPos.Z > 0) then
+                    RF.Outer.Position = NewUDim2(0, ScreenPos.X, 0, ScreenPos.Y)
+                    if Entry.DmgLabel then
+                        Entry.DmgLabel.Position = NewUDim2(0, ScreenPos.X, 0, ScreenPos.Y - CurrentSize * 0.5 - 8)
+                    end
+                end
+            end
+
+            if Entry.DmgLabel then
+                Entry.DmgLabel.TextTransparency = Alpha
+                Entry.DmgLabel.TextStrokeTransparency = 0.4 + 0.6 * Alpha
+            end
+
+            if Alpha >= 1 then
+                Destroy(Entry.LightPart)
+                if Entry.RingFrame then
+                    Destroy(Entry.RingFrame.Outer)
+                end
+                if Entry.DmgLabel then
+                    Destroy(Entry.DmgLabel)
+                end
+                Remove(HitActive, i)
+            end
+        end
+    end
+
+    RenderStepped:Connect(function()
+        TracerSystem.Step()
+        HitEffectSystem.Step()
+    end)
+end
+
+-- ============================================================
+-- UNIVERSAL WEAPON DETECTION
+-- ============================================================
+do
+    local OldFireServer = FireServer
+    local RealFireServer = hookfunction(OldFireServer, newcclosure(function(Remote, ...)
+        local Args = {...}
+
+        if Flags["visuals bullet tracers enabled"] and Flags["visuals bullet tracers enabled"].Value then
+            local Origin, Direction
+
+            for i = 1, #Args do
+                local Arg = Args[i]
+                local ArgType = typeof(Arg)
+
+                if ArgType == "Vector3" and not Origin then
+                    Origin = Arg
+                elseif ArgType == "Vector3" and Origin and not Direction then
+                    Direction = Arg
+                elseif ArgType == "CFrame" and not Origin then
+                    Origin    = Arg.Position
+                    Direction = Arg.LookVector
+                elseif ArgType == "table" then
+                    if typeof(Arg.Origin) == "Vector3" then Origin = Arg.Origin end
+                    if typeof(Arg.Direction) == "Vector3" then Direction = Arg.Direction end
+                    if typeof(Arg.Position) == "Vector3" then Origin = Arg.Position end
+                    if typeof(Arg.Target) == "Vector3" then Direction = (Arg.Target - (Origin or NewVector3())).Unit end
+                end
+            end
+
+            if Origin and Direction then
+                local RayResult = Workspace:Raycast(Origin, Direction * 2000)
+                local Impact = RayResult and RayResult.Position or (Origin + Direction * 500)
+
+                local TracerColor = Flags["visuals bullet tracers color"] and Flags["visuals bullet tracers color"].Color or NewRGB(255, 120, 40)
+                TracerSystem.Spawn(Origin, Impact, TracerColor)
+                TracerSystem.Spawn2D(Origin, Impact, TracerColor)
+
+                if RayResult and Flags["visuals hit effects enabled"] and Flags["visuals hit effects enabled"].Value then
+                    local HitInstance = RayResult.Instance
+                    if HitInstance then
+                        local HitChar = HitInstance:FindFirstAncestorOfClass("Model")
+                        if HitChar then
+                            local HitHumanoid = FindFirstChildOfClass(HitChar, "Humanoid")
+                            if HitHumanoid and HitChar ~= LocalPlayer.Character then
+                                HitEffectSystem.Spawn(RayResult.Position, HitInstance)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        return OldFireServer(Remote, ...)
+    end))
+
+    local function WatchHumanoid(Data)
+        if not Data.Humanoid then return end
+        Data.Humanoid.HealthChanged:Connect(function(NewHealth)
+            if not Flags["visuals hit effects enabled"] then return end
+            if not Flags["visuals hit effects enabled"].Value then return end
+            if Data.Health == nil then return end
+            if NewHealth < Data.Health and Data.Health > 0 then
+                if Data.RootPosition then
+                    HitEffectSystem.Spawn(Data.RootPosition + NewVector3(0, 1.5, 0), nil)
+                end
+            end
+        end)
+    end
+
+    Env.SpawnTracer    = TracerSystem.Spawn
+    Env.SpawnHitEffect = HitEffectSystem.Spawn
+end
+
+-- Debug helpers
+local function SafeWaitForChild(Parent, Timeout, Name)
+    if not Parent then return nil end
+    local Object = WaitForChild(Parent, Name, Timeout)
+    if Object then return Object end
+    return nil
+end
+
+local function GetTableIndexes(Table)
+    local Indexes = {}
+    local IndexesIndex = 0
+    for Index, _ in next, Table do
+        IndexesIndex += 1
+        Indexes[IndexesIndex] = Index
+    end
+    return Indexes, IndexesIndex
+end
+
+-- ============================================================
+-- FONTS
+-- ============================================================
+do
+    Fonts[1] = {
+        [1] = Menu:ImportFont("Minecraft", "https://github.com/exliation1337/Fonts/raw/refs/heads/main/Minecraft.ttf", 400, Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+        [2] = 10
+    }
+    Fonts[2] = {
+        [1] = Menu:ImportFont("Pixel", "https://github.com/exliation1337/Fonts/raw/refs/heads/main/Pixel.ttf", 400, Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+        [2] = 9
+    }
+end
+
+-- ============================================================
+-- CAMERA
+-- ============================================================
+do
+    local FrustumXDiv, FrustumYDiv
+    local HalfScreenX, HalfScreenY
+    local FrustumX, FrustumY
+
+    Camera.UpdateSize = function()
+        ScreenSize  = CurrentCamera.ViewportSize
+        ScreenSizeX, ScreenSizeY = ScreenSize.X, ScreenSize.Y
+        HalfScreenX, HalfScreenY = ScreenSizeX / 2, ScreenSizeY / 2
+        FrustumXDiv = ScreenSizeX / (FrustumX * 2)
+        FrustumYDiv = ScreenSizeY / (FrustumY * 2)
+    end
+
+    Camera.UpdateFOV = function()
+        FrustumY = Tan(CurrentCamera.FieldOfView * ToRad / 2)
+        FrustumX = ScreenSizeX / ScreenSizeY * FrustumY
+        FrustumXDiv = ScreenSizeX / (FrustumX * 2)
+        FrustumYDiv = ScreenSizeY / (FrustumY * 2)
+    end
+
+    Camera.WorldToViewportPoint = function(Position, CheckScreen)
+        local Projected = PointToObjectSpace(CurrentCamera.CFrame, Position)
+        local Z = -Projected.Z
+        local PositionX = HalfScreenX + Projected.X / Z * FrustumXDiv
+        local PositionY = HalfScreenY - Projected.Y / Z * FrustumYDiv
+        local OnScreen  = CheckScreen and Z > 0 and PositionX >= 0 and PositionX <= ScreenSizeX and PositionY >= 0 and PositionY <= ScreenSizeY
+        return NewVector3(PositionX, PositionY, Z), OnScreen
+    end
+
+    GetPropertyChangedSignal(CurrentCamera, "FieldOfView"):Connect(Camera.UpdateFOV)
+    GetPropertyChangedSignal(CurrentCamera, "ViewportSize"):Connect(Camera.UpdateSize)
+    Camera.UpdateFOV()
+    Camera.UpdateSize()
+end
+
+-- ============================================================
+-- MATHEMATICS
+-- ============================================================
+do
+    Mathematics.SolveBulletDrop = function(Origin, Acceleration, Goal, Velocity)
+        local Direction       = Goal - Origin
+        local Time            = Direction.Magnitude / Velocity
+        local HalfAcceleration = Acceleration / 2
+        local PreviousTime, Change, Iterations = nil, Huge, 0
+        while Change > 0.00001 and Iterations < 100 do
+            Iterations  += 1
+            PreviousTime = Time
+            Time         = (Direction - HalfAcceleration * Time ^ 2).Magnitude / Velocity
+            Change       = Abs(Time - PreviousTime)
+        end
+        return Origin + Direction - HalfAcceleration * Time ^ 2, Time
+    end
+
+    Mathematics.SolvePrediction = function(Origin, PartPosition, PartVelocity, Velocity)
+        return PartPosition + NewVector3(PartVelocity.X, 0, PartVelocity.Z) * ((Origin - PartPosition).Magnitude / Velocity + Ping / 2)
+    end
+
+    Mathematics.ResolveGrenadeVelocity = function(Origin, Goal, GrenadeVelocity, GrenadeGravity)
+        local Displacement  = Goal - Origin
+        local Horizontal    = NewVector3(Displacement.X, 0, Displacement.Z)
+        local HorizontalDist = Horizontal.Magnitude
+        local Discriminant  = GrenadeVelocity ^ 4 - GrenadeGravity * (GrenadeGravity * HorizontalDist ^ 2 + 2 * Displacement.Y * GrenadeVelocity ^ 2)
+        if Discriminant < 0 then return end
+        local Theta = Atan((GrenadeVelocity ^ 2 + Sqrt(Discriminant)) / (GrenadeGravity * HorizontalDist))
+        return Horizontal.Unit * (GrenadeVelocity * Cos(Theta)) + NewVector3(0, GrenadeVelocity * Sin(Theta), 0)
+    end
+end
+
+-- ============================================================
+-- LOCAL INFO  (universal)
+-- ============================================================
+do
+    LInfo.OnSpawn = function(Character)
+        LInfo.Character = Character
+        LInfo.Humanoid  = WaitForChild(Character, "Humanoid", Infinite)
+        LInfo.RootPart  = WaitForChild(Character, "HumanoidRootPart", Infinite)
+
+        Character.ChildAdded:Connect(function(Child)
+            if Child.ClassName == "Tool" then
+                local Config = FindFirstChild(Child, "Config")
+                if Config then
+                    local Ok, Cfg = pcall(require, Config)
+                    if Ok and Cfg and Cfg.BulletSettings then
+                        LInfo.Weapon           = Child
+                        LInfo.WeaponConfig     = Cfg
+                        LInfo.WeaponVelocity   = Cfg.BulletSettings.Velocity * 1.5
+                        LInfo.WeaponAcceleration = Cfg.BulletSettings.Acceleration
+                        return
+                    end
+                end
+                LInfo.Weapon             = Child
+                LInfo.WeaponConfig       = nil
+                LInfo.WeaponVelocity     = 300
+                LInfo.WeaponAcceleration = NewVector3(0, -Workspace.Gravity, 0)
+            end
+        end)
+
+        Character.ChildRemoved:Connect(function(Child)
+            if Child == LInfo.Weapon then
+                LInfo.Weapon             = nil
+                LInfo.WeaponConfig       = nil
+                LInfo.WeaponVelocity     = nil
+                LInfo.WeaponAcceleration = nil
+            end
+        end)
+
+        local PlayerGui = WaitForChild(LocalPlayer, "PlayerGui", Infinite)
+        local SuspectedInstance = nil
+        PlayerGui.DescendantAdded:Connect(function(Child)
+            local Name = Lower(Child.Name)
+            if SFind(Name, "pveye") or SFind(Name, "mousegui") or SFind(Name, "spectate") then
+                SuspectedInstance = Child
+                Menu:CreateNotification({
+                    Text    = Format("[WARNING] %s may be spectating you!\nChild: %s", LocalPlayer.Name, Child.Name),
+                    LifeTime = 15,
+                    Color   = NewRGB(255, 0, 0),
+                    Priority = 1000
+                })
+            end
+        end)
+        PlayerGui.DescendantRemoving:Connect(function(Child)
+            if Child == SuspectedInstance then
+                Menu:CreateNotification({
+                    Text    = "[WARNING] Spectator may have left",
+                    LifeTime = 10,
+                    Color   = NewRGB(0, 255, 0),
+                    Priority = 999
+                })
+                SuspectedInstance = nil
+            end
+        end)
+    end
+
+    if LocalPlayer.Character then LInfo.OnSpawn(LocalPlayer.Character) end
+    LocalPlayer.CharacterAdded:Connect(LInfo.OnSpawn)
+end
+
+-- ============================================================
+-- INFO  (universal player tracking)
+-- FIX: BodyParts populate independently of chams state
+-- ============================================================
+do
+    Info.Players      = {}
+    Info.PlayersIndex = 0
+    Info.LastSort     = 0
+
+    Info.AddPlayer = function(Player)
+        local Data = {
+            Player    = Player,
+            Name      = Player.Name,
+            IsForceField = false,
+            Joints    = {},
+            BodyParts = {},
+            Relation  = nil,
+            Health    = 0,
+            MaxHealth = 100,
+            Distance  = 0,
+            Weapon    = nil,
+            Rank      = 1,
+            Chams     = Esp.CreateChams(Player),
+            Renders   = Esp.AddPlayer(Player)
+        }
+
+        Data.OnSpawn = function(Character)
+            Data.Character = Character
+            Data.Humanoid  = WaitForChild(Character, "Humanoid", Infinite)
+            Data.RootPart  = WaitForChild(Character, "HumanoidRootPart", Infinite)
+            Data.Health    = Data.Humanoid.Health
+            Data.MaxHealth = Data.Humanoid.MaxHealth
+
+            Data.Character.ChildAdded:Connect(function(Child)
+                local ClassName = Child.ClassName
+                if ClassName == "Tool" then
+                    Data.Weapon = Child.Name
+                elseif ClassName == "ForceField" then
+                    Data.IsForceField = true
+                elseif ClassName == "Part" and BodyPartList[Child.Name] then
+                    -- FIX: always register parts regardless of chams
+                    Data.BodyParts[Child.Name] = Child
+                    Data.UpdateJoints()
+                    -- update chams adornee if chams active
+                    if Flags["esp players chams"] and Flags["esp players chams"].Value then
+                        local ChamSet = Data.Chams[Child.Name]
+                        if ChamSet then
+                            ChamSet[1].Adornee = Child
+                            ChamSet[2].Adornee = Child
+                        end
+                    end
+                end
+            end)
+
+            Data.Character.ChildRemoved:Connect(function(Child)
+                if not Data.Character then return end
+                local ClassName = Child.ClassName
+                if ClassName == "Tool" then
+                    Data.Weapon = nil
+                elseif ClassName == "ForceField" and not FindFirstChildOfClass(Data.Character, "ForceField") then
+                    Data.IsForceField = false
+                elseif ClassName == "Part" and Data.BodyParts[Child.Name] then
+                    Data.BodyParts[Child.Name] = nil
+                    Data.UpdateJoints()
+                end
+            end)
+
+            Data.Character.AncestryChanged:Connect(function(Character, Parent)
+                if Parent == nil then
+                    Data.Character   = nil
+                    Data.Humanoid    = nil
+                    Data.RootPart    = nil
+                    Data.Health      = 0
+                    Data.RootCFrame  = nil
+                    Data.RootPosition = nil
+                    Data.Weapon      = nil
+                    Data.Distance    = 0
+                    Data.Joints      = {}
+                    Data.BodyParts   = {}
+                end
+            end)
+
+            Data.Humanoid.HealthChanged:Connect(function()
+                if Data.Humanoid then
+                    Data.Health    = Data.Humanoid.Health
+                    Data.MaxHealth = Data.Humanoid.MaxHealth
+                end
+            end)
+
+            Data.Humanoid.Died:Connect(function()
+                Data.Character   = nil
+                Data.Humanoid    = nil
+                Data.RootPart    = nil
+                Data.Health      = 0
+                Data.RootCFrame  = nil
+                Data.RootPosition = nil
+                Data.Weapon      = nil
+                Data.Distance    = 0
+                Data.Joints      = {}
+                Data.BodyParts   = {}
+            end)
+
+            -- FIX: scan ALL children unconditionally, not just when chams enabled
+            local Children = GetChildren(Data.Character)
+            for i = 1, #Children do
+                local Child     = Children[i]
+                local ClassName = Child.ClassName
+                if ClassName == "Tool" then
+                    Data.Weapon = Child.Name
+                elseif ClassName == "ForceField" then
+                    Data.IsForceField = true
+                elseif ClassName == "Part" and BodyPartList[Child.Name] then
+                    Data.BodyParts[Child.Name] = Child
+                end
+            end
+
+            Data.UpdateJoints()
+            Esp.UpdateChamsPlayer(Data, Flags["esp players chams"].Value)
+
+            if Flags["visuals hit effects enabled"] and Flags["visuals hit effects enabled"].Value then
+                local LastHealth = Data.Health
+                Data.Humanoid.HealthChanged:Connect(function(NewHealth)
+                    if NewHealth < LastHealth and Data.RootPosition then
+                        HitEffectSystem.Spawn(Data.RootPosition + NewVector3(0, 1.5, 0), nil)
+                    end
+                    LastHealth = NewHealth
+                end)
+            end
+        end
+
+        Data.UpdateJoints = function()
+            Data.Joints = {}
+            for i = 1, #SkeletonJoints do
+                local PartA = Data.BodyParts[SkeletonJoints[i][1]]
+                local PartB = Data.BodyParts[SkeletonJoints[i][2]]
+                if PartA and PartB then
+                    Data.Joints[#Data.Joints + 1] = {PartA, PartB}
+                end
+            end
+        end
+
+        Data.OnSpawnConnection = Player.CharacterAdded:Connect(Data.OnSpawn)
+        if Player.Character then Data.OnSpawn(Player.Character) end
+
+        Info.PlayersIndex += 1
+        Info.Players[Info.PlayersIndex] = Data
+        Info.Players[Player]            = Data
+        Info.Players[Player.Name]       = Data
+
+        return Data
+    end
+
+    Info.RemovePlayer = function(Player)
+        local Data = Info.Players[Player]
+        if not Data then return end
+
+        for _, Render in next, Data.Renders do Destroy(Render) end
+        for _, Cham in next, Data.Chams do
+            Destroy(Cham[1])
+            Destroy(Cham[2])
+        end
+
+        Info.Players[Player]      = nil
+        Info.Players[Player.Name] = nil
+
+        for i = 1, Info.PlayersIndex do
+            if Info.Players[i] == Data then
+                Remove(Info.Players, i)
+                Info.PlayersIndex -= 1
+                break
+            end
+        end
+    end
+
+    Info.Step = function()
+        local DistanceOrigin = LInfo.RootPart and LInfo.RootPart.Position
+        local PlayersList    = Info.Players
+        local PlayersIndex   = Info.PlayersIndex
+
+        for i = 1, PlayersIndex do
+            local Data = PlayersList[i]
+            if Data.Humanoid and Data.RootPart then
+                Data.RootCFrame   = Data.RootPart.CFrame
+                Data.RootPosition = Data.RootPart.Position
+                if DistanceOrigin then
+                    Data.Distance = (DistanceOrigin - Data.RootPosition).Magnitude
+                end
+            end
+        end
+
+        local Time = Tick()
+        if Time - Info.LastSort > 0.5 then
+            for i = 1, PlayersIndex - 1 do
+                local Player1 = PlayersList[i]
+                local Rank1   = (Player1.Relation == "Priority" and 2) or 1
+                for j = i + 1, PlayersIndex do
+                    local Player2 = PlayersList[j]
+                    local Rank2   = (Player2.Relation == "Priority" and 2) or 1
+                    if Rank1 < Rank2 then
+                        PlayersList[i], PlayersList[j] = PlayersList[j], PlayersList[i]
+                        Rank1   = Rank2
+                        Player1 = PlayersList[i]
+                    end
+                end
+            end
+            Info.LastSort = Time
+        end
+    end
+
+    Info.Load = function()
+        local PlayerList = Players:GetPlayers()
+        for i = 1, #PlayerList do
+            if PlayerList[i] ~= LocalPlayer then
+                Info.AddPlayer(PlayerList[i])
+            end
+        end
+        PlayerAdded:Connect(function(Player)
+            if Player ~= LocalPlayer then Info.AddPlayer(Player) end
+        end)
+        PlayerRemoved:Connect(Info.RemovePlayer)
+        Stepped:Connect(Info.Step)
+        Info.Loaded = true
+    end
+end
+
+-- ============================================================
+-- LEGIT
+-- FIX 1: Aimbot speed — linear mode não depende mais de DeltaTime puro
+-- FIX 2: Hitbox priority — filtra por selected hitboxes primeiro, priority second
+-- FIX 3: Enemy detection — não depende mais de chams pra ter BodyParts
+-- ============================================================
+do
+    Legit.CurrentTarget  = nil
+    Legit.PreviousTarget = { Data = {}, Tick = 0 }
+
+    Legit.Points         = {
+        ["Head"] = {"Head"},
+        ["Body"] = {"Torso"},
+        ["Arms"] = {"Right Arm", "Left Arm"},
+        ["Legs"] = {"Right Leg", "Left Leg"}
+    }
+
+    -- FIX: mapeamento direto de priority name -> part name
+    Legit.PriorityPartMap = {
+        ["Head"] = "Head",
+        ["Body"] = "Torso",
+        ["Closest"] = nil  -- nil = sem priority filter
+    }
+
+    Legit.PointSizes = {
+        ["Head"] = NewVector3(1,1,1),
+        ["Torso"] = NewVector3(2,2,1),
+        ["Left Arm"] = NewVector3(1,2,1),
+        ["Right Arm"] = NewVector3(1,2,1),
+        ["Left Leg"] = NewVector3(1,2,1),
+        ["Right Leg"] = NewVector3(1,2,1)
+    }
+
+    local RayParamsWall = RaycastParams.new()
+    RayParamsWall.FilterType = Enum.RaycastFilterType.Exclude
+    RayParamsWall.RespectCanCollide = false
+    Legit.RayParams = RayParamsWall
+
+    -- Mouse mode helpers
+    Legit.GetMousePixelAngle = function(WorldPosition)
+        local Screen, OnScreen = Camera.WorldToViewportPoint(WorldPosition, false)
+        if Screen.Z <= 0 then return nil end
+        local MousePos = UserInputService:GetMouseLocation()
+        local DX = Screen.X - MousePos.X
+        local DY = Screen.Y - MousePos.Y
+        return Sqrt(DX * DX + DY * DY), Screen
+    end
+
+    -- FOV circles
+    do
+        local AssistCircle = Draw:Frame({Parent = Menu.Overlay, Position = NewUDim2(0,0,0,0), Size = NewUDim2(0,0,0,0), BackgroundColor3 = NewRGB(255,255,255), BackgroundTransparency = 1, ZIndex = 1000, Visible = false})
+        Draw:UIStroke({Parent = AssistCircle, LineJoinMode = Enum.LineJoinMode.Round, Color = NewRGB(181,179,253), Transparency = 0, Thickness = 1})
+        local c1 = NewInstance("UICorner"); c1.Parent = AssistCircle; c1.CornerRadius = UDim.new(1,0)
+
+        local SilentCircle = Draw:Frame({Parent = Menu.Overlay, Position = NewUDim2(0,0,0,0), Size = NewUDim2(0,0,0,0), BackgroundColor3 = NewRGB(255,255,255), BackgroundTransparency = 1, ZIndex = 1000, Visible = false})
+        Draw:UIStroke({Parent = SilentCircle, LineJoinMode = Enum.LineJoinMode.Round, Color = NewRGB(127,72,163), Transparency = 0, Thickness = 1})
+        local c2 = NewInstance("UICorner"); c2.Parent = SilentCircle; c2.CornerRadius = UDim.new(1,0)
+
+        local MouseCircle = Draw:Frame({Parent = Menu.Overlay, Position = NewUDim2(0,0,0,0), Size = NewUDim2(0,0,0,0), BackgroundColor3 = NewRGB(255,255,255), BackgroundTransparency = 1, ZIndex = 1000, Visible = false})
+        Draw:UIStroke({Parent = MouseCircle, LineJoinMode = Enum.LineJoinMode.Round, Color = NewRGB(255,200,80), Transparency = 0, Thickness = 1})
+        local c3 = NewInstance("UICorner"); c3.Parent = MouseCircle; c3.CornerRadius = UDim.new(1,0)
+
+        RenderStepped:Connect(function()
+            local IsMouseMode = Flags["legit aim assist mode"] and Flags["legit aim assist mode"].Value == "Mouse"
+
+            if Flags["legit aim assist visualize fov"] and Flags["legit aim assist visualize fov"].Value then
+                if IsMouseMode then
+                    local MousePos = UserInputService:GetMouseLocation()
+                    local Radius = Flags["legit aim assist mouse fov radius"] and Flags["legit aim assist mouse fov radius"].Value or 80
+                    local Diameter = Radius * 2
+                    MouseCircle.Size     = NewUDim2(0, Diameter, 0, Diameter)
+                    MouseCircle.Position = NewUDim2(0, MousePos.X - Radius, 0, MousePos.Y - Radius)
+                    MouseCircle.Visible  = true
+                    AssistCircle.Visible = false
+                else
+                    local Radius   = (Tan(Rad(Flags["legit aim assist fov"].Value) / 2) / Tan(Rad(CurrentCamera.FieldOfView) / 2)) * (ScreenSizeY / 2)
+                    local Diameter = Radius * 2
+                    AssistCircle.Size     = NewUDim2(0, Diameter, 0, Diameter)
+                    AssistCircle.Position = NewUDim2(0.5, -Radius, 0.5, -Radius)
+                    AssistCircle.Visible  = true
+                    MouseCircle.Visible   = false
+                end
+            else
+                AssistCircle.Visible = false
+                MouseCircle.Visible  = false
+            end
+
+            if Flags["legit bullet redirection visualize fov"] and Flags["legit bullet redirection visualize fov"].Value then
+                local Radius   = (Tan(Rad(Flags["legit bullet redirection silent aim fov"].Value) / 2) / Tan(Rad(CurrentCamera.FieldOfView) / 2)) * (ScreenSizeY / 2)
+                local Diameter = Radius * 2
+                SilentCircle.Size     = NewUDim2(0, Diameter, 0, Diameter)
+                SilentCircle.Position = NewUDim2(0.5, -Radius, 0.5, -Radius)
+                SilentCircle.Visible  = true
+            else
+                SilentCircle.Visible = false
+            end
+        end)
+    end
+
+    Legit.Raycast = function(Origin, Goal, RayParams)
+        local Direction      = Goal - Origin
+        local DirectionUnit  = Direction.Unit
+        local CurrentOrigin  = Origin
+        local RemainingDist  = Direction.Magnitude
+
+        while RemainingDist > 0 do
+            local Result = Raycast(Workspace, CurrentOrigin, DirectionUnit * RemainingDist, RayParams)
+            if not Result then return false end
+            local HitPart = Result.Instance
+            if HitPart and HitPart.CanCollide and HitPart.Transparency < 1 then return true, Result end
+            RemainingDist  = RemainingDist - (Result.Position - CurrentOrigin).Magnitude
+            CurrentOrigin  = Result.Position + DirectionUnit / 20
+        end
+        return false
+    end
+
+    Legit.TriggerbotRaycast = function(Origin, Goal, RayParams)
+        local Direction      = Goal - Origin
+        local DirectionUnit  = Direction.Unit
+        local CurrentOrigin  = Origin
+        local RemainingDist  = Direction.Magnitude
+
+        while RemainingDist > 0 do
+            local Result = Raycast(Workspace, CurrentOrigin, DirectionUnit * RemainingDist, RayParams)
+            if not Result then return false end
+            local HitPart = Result.Instance
+            if HitPart and HitPart.Transparency < 1 then return true, Result end
+            RemainingDist  = RemainingDist - (Result.Position - CurrentOrigin).Magnitude
+            CurrentOrigin  = Result.Position + DirectionUnit / 20
+        end
+        return false
+    end
+
+    -- FIX: TranslatePoints retorna lista flat de part names
+    Legit.TranslatePoints = function(Points)
+        local Temporary = {}
+        for i = 1, #Points do
+            local Group = Legit.Points[Points[i]]
+            if Group then
+                Move(Group, 1, #Group, #Temporary + 1, Temporary)
+            end
+        end
+        return Temporary
+    end
+
+    Legit.GetPointScalePosition = function(Bone, Scale)
+        if Scale == 0 then return Bone.Position end
+        local Factor = Scale / 200
+        local Size   = Legit.PointSizes[Bone.Name]
+        return Bone.Position + NewVector3(
+            (Random() * 2 - 1) * Size.X * Factor,
+            (Random() * 2 - 1) * Size.Y * Factor,
+            (Random() * 2 - 1) * Size.Z * Factor
+        )
+    end
+
+    -- ─────────────────────────────────────────────────────────────
+    -- PROCESS AIM ASSIST — FIXED
+    -- FIX 1: Speed linear não depende de DeltaTime (instantâneo em 100%)
+    -- FIX 2: Priority só filtra dentro dos hitboxes selecionados
+    -- FIX 3: Detecta todos os players, não só os com chams
+    -- ─────────────────────────────────────────────────────────────
+    Legit.ProcessAimAssist = function(DeltaTime)
+        local AssistEnabled = Flags["legit aim assist enabled"] and Flags["legit aim assist enabled"].Value
+                           and Flags["legit aim assist enabled key"] and Flags["legit aim assist enabled key"].Value
+
+        local IsMagnet = Flags["legit trigger bot magnet triggerbot"] and Flags["legit trigger bot magnet triggerbot"].Value
+                      and Flags["legit trigger bot enabled"] and Flags["legit trigger bot enabled"].Value
+                      and Flags["legit trigger bot enabled key"] and Flags["legit trigger bot enabled key"].Value
+
+        if not AssistEnabled and not IsMagnet then
+            Legit.CurrentTarget = nil; return
+        end
+
+        local IsMouseMode = Flags["legit aim assist mode"] and Flags["legit aim assist mode"].Value == "Mouse"
+
+        local CameraCFrame     = CurrentCamera.CFrame
+        local CameraPosition   = CameraCFrame.Position
+        local CameraLookVector = CameraCFrame.LookVector
+
+        -- Se já temos target, processa suavização
+        if Legit.CurrentTarget then
+            local CurrentTarget = Legit.CurrentTarget
+            local CurrentPart   = CurrentTarget.Part
+            local CurrentData   = CurrentTarget.Data
+
+            -- Verifica se a part ainda existe e é válida
+            if not CurrentPart or not CurrentPart.Parent then
+                Legit.CurrentTarget = nil; return
+            end
+
+            if CurrentData.RootPosition and (CurrentData == Legit.PreviousTarget.Data or Tick() - Legit.PreviousTarget.Tick > (Flags["legit aim assist enemy switching delay"].Value / 1000)) then
+                local AimPosition = CurrentPart.Position
+
+                if IsMagnet or (Flags["legit aim assist wall check"] and Flags["legit aim assist wall check"].Value) then
+                    local Hit = Legit.Raycast(CameraPosition, AimPosition, Legit.RayParams)
+                    if Hit then Legit.CurrentTarget = nil; return end
+                end
+
+                local WeaponVelocity     = LInfo.WeaponVelocity or 300
+                local WeaponAcceleration = LInfo.WeaponAcceleration or NewVector3(0, -Workspace.Gravity, 0)
+
+                if Flags["legit aim assist adjust for target movement"] and Flags["legit aim assist adjust for target movement"].Value then
+                    AimPosition = Mathematics.SolvePrediction(CameraPosition, AimPosition, CurrentPart.Velocity, WeaponVelocity)
+                end
+                if Flags["legit aim assist adjust for bullet drop"] and Flags["legit aim assist adjust for bullet drop"].Value then
+                    AimPosition = Mathematics.SolveBulletDrop(CameraPosition, WeaponAcceleration, AimPosition, WeaponVelocity)
+                end
+
+                Legit.PreviousTarget.Data = CurrentTarget.Data
+                Legit.PreviousTarget.Tick = Tick()
+
+                -- FIX: cálculo de speed corrigido
+                -- Speed 1-100 → 0.01 a 1.0 de lerp factor por frame
+                -- Linear: speed/100 por frame (100% = instantâneo)
+                -- Exponential: suavização com curva
+                local Speed = (IsMagnet and Flags["legit trigger bot magnet speed"].Value or Flags["legit aim assist speed"].Value) / 100
+                local Smoothing
+
+                if Flags["legit aim assist smoothing"] and Flags["legit aim assist smoothing"].Value == "Linear" then
+                    -- FIX: Linear agora é direto — speed=100% chega instantâneo
+                    -- Normalizado: speed=50 → ~3 frames pra chegar, speed=100 → imediato
+                    Smoothing = Clamp(Speed * 3 * DeltaTime * 60, 0, 1)
+                    -- Clamp(speed * velocidade_base * frames_normalizados, 0, 1)
+                    -- Em 60fps: speed=100 → Clamp(3.0, 0, 1) = 1.0 (instantâneo)
+                    -- Em 60fps: speed=50  → Clamp(1.5, 0, 1) = 1.0 ainda muito rápido
+                    -- Ajuste: base 0.5 pra dar range real
+                    Smoothing = Clamp(Speed * 1.5 * DeltaTime * 60, 0, 1)
+                else
+                    -- Exponential: preserva comportamento original mas mais responsivo
+                    Smoothing = 1 - Exp(-Speed * 8 * DeltaTime)
+                end
+
+                if IsMouseMode then
+                    local Screen, _ = Camera.WorldToViewportPoint(AimPosition, false)
+                    if Screen.Z > 0 then
+                        local MousePos   = UserInputService:GetMouseLocation()
+                        local TargetX    = Screen.X
+                        local TargetY    = Screen.Y
+                        local NewMouseX  = MousePos.X + (TargetX - MousePos.X) * Smoothing
+                        local NewMouseY  = MousePos.Y + (TargetY - MousePos.Y) * Smoothing
+                        mousemoveabs(NewMouseX, NewMouseY)
+                    end
+                else
+                    CurrentCamera.CFrame = CameraCFrame:Lerp(CFrame.lookAt(CameraPosition, AimPosition), Smoothing)
+                end
+                return
+            end
+            Legit.CurrentTarget = nil; return
+        end
+
+        -- Seleção do melhor target
+        local Enemies, EnemiesIndex = {}, 0
+
+        if IsMouseMode then
+            local MousePixelRadius = Flags["legit aim assist mouse fov radius"] and Flags["legit aim assist mouse fov radius"].Value or 80
+
+            -- FIX: itera todos os players sem depender de chams
+            for i = 1, Info.PlayersIndex do
+                local Data = Info.Players[i]
+                local RootPosition = Data.RootPosition
+                if not RootPosition or Data.IsForceField or Data.Relation == "Friendly" then continue end
+                -- FIX: checa se player tem body parts registradas (não depende de chams)
+                if not next(Data.BodyParts) then continue end
+                local PixelDist = Legit.GetMousePixelAngle(RootPosition)
+                if PixelDist and PixelDist <= MousePixelRadius then
+                    EnemiesIndex += 1
+                    Enemies[EnemiesIndex] = Data
+                end
+            end
+        else
+            local RadFov = Rad(IsMagnet and Flags["legit trigger bot magnet fov"].Value or Flags["legit aim assist fov"].Value)
+            for i = 1, Info.PlayersIndex do
+                local Data = Info.Players[i]
+                local RootPosition = Data.RootPosition
+                if not RootPosition or Data.IsForceField or Data.Relation == "Friendly" then continue end
+                -- FIX: checa body parts sem depender de chams
+                if not next(Data.BodyParts) then continue end
+                if Acos(Clamp(Dot(CameraLookVector, (RootPosition - CameraPosition).Unit), -1, 1)) * 2 > RadFov then continue end
+                EnemiesIndex += 1
+                Enemies[EnemiesIndex] = Data
+            end
+        end
+
+        if EnemiesIndex < 1 then return end
+
+        -- FIX: obtém hitboxes selecionados como lista de part names
+        local SelectedHitboxGroups = IsMagnet and Flags["legit trigger bot triggerbot hitboxes"].Value or Flags["legit aim assist hitscan points"].Value
+        local HitscanPoints = Legit.TranslatePoints(SelectedHitboxGroups)
+
+        -- FIX: priority name → part name (dentro dos hitboxes selecionados)
+        local PriorityStr = IsMagnet and Flags["legit trigger bot magnet priority"].Value or Flags["legit aim assist hitscan priority"].Value
+        local HitscanPriority = Legit.PriorityPartMap[PriorityStr]  -- nil se "Closest"
+
+        -- FIX: valida que a priority part está nos hitboxes selecionados
+        -- Ex: se só "Head" selecionado e priority="Body", priority vira nil (ignora)
+        if HitscanPriority then
+            local InSelected = false
+            for k = 1, #HitscanPoints do
+                if HitscanPoints[k] == HitscanPriority then
+                    InSelected = true; break
+                end
+            end
+            if not InSelected then HitscanPriority = nil end
+        end
+
+        local CheckWall = IsMagnet or (Flags["legit aim assist wall check"] and Flags["legit aim assist wall check"].Value)
+
+        -- Coleta todos os pontos válidos
+        local Points, PointsIndex = {}, 0
+
+        for i = 1, EnemiesIndex do
+            local EnemyData      = Enemies[i]
+            local EnemyBodyParts = EnemyData.BodyParts
+            for k = 1, #HitscanPoints do
+                local Point = EnemyBodyParts[HitscanPoints[k]]
+                if not Point then continue end
+                local PointPosition = Point.Position
+                if CheckWall then
+                    local Hit = Legit.Raycast(CameraPosition, PointPosition, Legit.RayParams)
+                    if Hit then continue end
+                end
+
+                local SortMetric
+                if IsMouseMode then
+                    local PixelDist = Legit.GetMousePixelAngle(PointPosition)
+                    SortMetric = PixelDist or Huge
+                else
+                    SortMetric = Acos(Clamp(Dot(CameraLookVector, (PointPosition - CameraPosition).Unit), -1, 1)) * 2
+                end
+
+                PointsIndex += 1
+                Points[PointsIndex] = {
+                    Part  = Point,
+                    Data  = EnemyData,
+                    Angle = SortMetric
+                }
+            end
+        end
+
+        if PointsIndex < 1 then return end
+
+        -- FIX: verifica accuracy antes de aplicar priority
+        local AccuracyCheck = (IsMagnet and Flags["legit trigger bot magnet accuracy"].Value or Flags["legit aim assist accuracy"].Value) >= Random(1, 100)
+
+        -- FIX: se tem priority E accuracy passou, filtra por priority dentro dos points válidos
+        if HitscanPriority and AccuracyCheck then
+            local ClosestPriority, ClosestPriorityAngle = nil, Huge
+            for i = 1, PointsIndex do
+                local Point = Points[i]
+                if Point.Part.Name == HitscanPriority and Point.Angle < ClosestPriorityAngle then
+                    ClosestPriorityAngle = Point.Angle
+                    ClosestPriority = Point
+                end
+            end
+            if ClosestPriority then
+                Legit.CurrentTarget = ClosestPriority
+                Legit.CurrentTarget.Tick = Tick()
+                return
+            end
+            -- Se não achou priority part (ex: blocked por wall), cai pro closest
+        end
+
+        -- Fallback: closest de todos os points válidos
+        local ClosestPoint, ClosestAngle = nil, Huge
+        for i = 1, PointsIndex do
+            local Point = Points[i]
+            if Point.Angle < ClosestAngle then
+                ClosestAngle = Point.Angle
+                ClosestPoint = Point
+            end
+        end
+        Legit.CurrentTarget = ClosestPoint
+        if Legit.CurrentTarget then Legit.CurrentTarget.Tick = Tick() end
+    end
+
+    local TriggerRayParams = RaycastParams.new()
+    TriggerRayParams.FilterType         = Enum.RaycastFilterType.Include
+    TriggerRayParams.RespectCanCollide  = false
+    Legit.TriggerParams = TriggerRayParams
+
+    Legit.ProcessTriggerBot = function()
+        if not (Flags["legit trigger bot enabled"] and Flags["legit trigger bot enabled"].Value)
+        or not (Flags["legit trigger bot enabled key"] and Flags["legit trigger bot enabled key"].Value) then return end
+
+        local Points, PointsIndex = {}, 0
+        for i = 1, Info.PlayersIndex do
+            local Data = Info.Players[i]
+            if not Data.RootPosition or Data.Relation == "Friendly" or Data.IsForceField then continue end
+            local HitscanPoints = Legit.TranslatePoints(Flags["legit trigger bot triggerbot hitboxes"].Value)
+            local BodyParts     = Data.BodyParts
+            for k = 1, #HitscanPoints do
+                local Point = BodyParts[HitscanPoints[k]]
+                if not Point then continue end
+                PointsIndex += 1
+                Points[PointsIndex] = Point
+            end
+        end
+        if PointsIndex < 1 then return end
+
+        local CameraCFrame   = CurrentCamera.CFrame
+        local CameraPosition = CameraCFrame.Position
+
+        Legit.TriggerParams.FilterDescendantsInstances = Points
+        local Hit, Result = Legit.TriggerbotRaycast(CameraPosition, CameraPosition + CameraCFrame.LookVector * 750, Legit.TriggerParams)
+        if not Hit then return end
+
+        local Hit2 = Legit.Raycast(CameraPosition, Result.Instance.Position, Legit.RayParams)
+        if Hit2 then return end
+
+        Wrap(function()
+            mouse1press()
+            Wait(1 / 60)
+            mouse1release()
+        end)()
+    end
+
+    RenderStepped:Connect(Legit.ProcessAimAssist)
+    RenderStepped:Connect(Legit.ProcessTriggerBot)
+end
+
+-- ============================================================
+-- ESP
+-- FIX: boxes, healthbar, name dinâmicos — calculados a partir de
+-- projeções reais das extremidades do personagem, não offset fixo
+-- ============================================================
+do
+    Esp.AddPlayer = function(Player)
+        local This = {}
+
+        This.Framework = Draw:Frame({
+            Name = Player.Name, Parent = Menu.Overlay, Visible = true, BackgroundTransparency = 1
+        })
+
+        This.BoxOutline = Draw:UIStroke({Parent = This.Framework, LineJoinMode = Enum.LineJoinMode.Miter, Thickness = 3, Transparency = 0.25, Color = NewRGB(0,0,0)})
+
+        This.Box = Draw:Frame({
+            ZIndex = 1, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(0,0,0,0), Size = NewUDim2(1,0,1,0), BackgroundTransparency = 1
+        })
+
+        This.BoxInline  = Draw:UIStroke({Parent = This.Box, LineJoinMode = Enum.LineJoinMode.Miter, Thickness = 1, Transparency = 0, Color = NewRGB(3,162,158)})
+
+        This.BoxFill = Draw:Frame({
+            ZIndex = 2, Parent = This.Box, Visible = false,
+            Position = NewUDim2(0,1,0,1), Size = NewUDim2(1,-2,1,-2),
+            BackgroundTransparency = 0.8, BackgroundColor3 = NewRGB(0,0,0), BorderSizePixel = 0
+        })
+
+        -- FIX: HealthOutline posicionada FORA do box (à esquerda, -6px de offset)
+        -- Usa Position absoluta baseada no Framework, não relativa com offset fixo -7
+        This.HealthOutline = Draw:Frame({
+            ZIndex = 3, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(0, -6, 0, 0),
+            Size = NewUDim2(0, 3, 1, 0),
+            BorderSizePixel = 0,
+            BackgroundColor3 = NewRGB(20, 20, 20),
+            BackgroundTransparency = 0.3
+        })
+
+        This.HealthInline = Draw:Frame({
+            ZIndex = 4, Parent = This.HealthOutline, Visible = true,
+            AnchorPoint = NewVector2(0, 1),
+            Position = NewUDim2(0, 0, 1, 0),
+            Size = NewUDim2(1, 0, 1, 0),
+            BorderSizePixel = 0,
+            BackgroundColor3 = NewRGB(0, 255, 0),
+            BackgroundTransparency = 0
+        })
+
+        Draw:UIStroke({Parent = This.HealthOutline, Transparency = 0.5, Thickness = 1, Color = NewRGB(0,0,0)})
+
+        -- FIX: Name posicionado ACIMA do box com offset negativo correto
+        This.Name = Draw:TextLabel({
+            ZIndex = 3, Parent = This.Framework, Visible = false,
+            AnchorPoint = NewVector2(0.5, 1),
+            Position = NewUDim2(0.5, 0, 0, -2),
+            Size = NewUDim2(1, 0, 0, 12),
+            Text = Player.Name,
+            FontFace = Fonts[1][1], TextSize = Fonts[1][2],
+            TextColor3 = NewRGB(255,255,255), TextTransparency = 0,
+            TextStrokeTransparency = 1, BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Center
+        })
+
+        This.NameShadow = Draw:TextLabel({
+            ZIndex = 2, Parent = This.Framework, Visible = false,
+            AnchorPoint = NewVector2(0.5, 1),
+            Position = NewUDim2(0.5, 1, 0, -1),
+            Size = NewUDim2(1, 0, 0, 12),
+            Text = Player.Name,
+            FontFace = Fonts[1][1], TextSize = Fonts[1][2],
+            TextColor3 = NewRGB(0,0,0), TextTransparency = 0,
+            TextStrokeTransparency = 1, BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Center
+        })
+
+        -- FIX: Weapon e Distance posicionados ABAIXO do box
+        This.Weapon = Draw:TextLabel({
+            ZIndex = 3, Parent = This.Framework, Visible = false,
+            AnchorPoint = NewVector2(0.5, 0),
+            Position = NewUDim2(0.5, 0, 1, 3),
+            Size = NewUDim2(1, 0, 0, 10),
+            Text = "",
+            FontFace = Fonts[2][1], TextSize = Fonts[2][2],
+            TextColor3 = NewRGB(255,255,255), TextTransparency = 0,
+            TextStrokeTransparency = 1, BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Center
+        })
+
+        This.Distance = Draw:TextLabel({
+            ZIndex = 3, Parent = This.Framework, Visible = false,
+            AnchorPoint = NewVector2(0.5, 0),
+            Position = NewUDim2(0.5, 0, 1, 14),
+            Size = NewUDim2(1, 0, 0, 10),
+            Text = "50.0M",
+            FontFace = Fonts[2][1], TextSize = Fonts[2][2],
+            TextColor3 = NewRGB(255,255,255), TextTransparency = 0,
+            TextStrokeTransparency = 1, BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Center
+        })
+
+        This.Rank = Draw:TextLabel({
+            ZIndex = 3, Parent = This.Framework, Visible = false,
+            AnchorPoint = NewVector2(0, 0),
+            Position = NewUDim2(1, 4, 0, 0),
+            Size = NewUDim2(0, 30, 0, 10),
+            Text = "",
+            FontFace = Fonts[2][1], TextSize = Fonts[2][2],
+            TextColor3 = NewRGB(255,255,255), TextTransparency = 0,
+            TextStrokeTransparency = 1, BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Left
+        })
+
+        Draw:UIStroke({Parent = This.Weapon,   Transparency = 0.4})
+        Draw:UIStroke({Parent = This.Distance,  Transparency = 0.4})
+        Draw:UIStroke({Parent = This.Rank,      Transparency = 0.4})
+
+        This.Arrow = Draw:ImageLabel({
+            ZIndex = 4, Parent = Menu.Overlay, Visible = false,
+            Size = NewUDim2(0,10,0,10), BackgroundTransparency = 1, BorderSizePixel = 0,
+            Image = "http://www.roblox.com/asset/?id=15000587389"
+        })
+
+        for i = 1, 9 do
+            local Line = NewInstance("Frame")
+            Line.Parent          = Menu.Overlay
+            Line.AnchorPoint     = NewVector2(0.5, 0.5)
+            Line.BorderSizePixel = 0
+            Line.BackgroundColor3 = NewRGB(255,255,255)
+            This[i] = Line
+        end
+
+        return This
+    end
+
+    Esp.CreateChams = function(Player)
+        local Chams = {}
+        local Names = BodyPartNames
+        for i = 1, #Names do
+            local PartName = Names[i]
+            local PartSize = BodyPartSizes[PartName]
+            local IsHead   = PartName == "Head"
+            local ChamSet  = {}
+            for k = 1, 2 do
+                local Inline = (k == 1)
+                local Cham
+                if IsHead then
+                    local Sub = Inline and 0.4 or 0.3
+                    Cham = NewInstance("CylinderHandleAdornment")
+                    Cham.Parent = Menu.Overlay
+                    Cham.CFrame = NewCFrame(NewVector3(), NewVector3(0,1,0))
+                    Cham.Height = PartSize.Y + 0.4 - Sub
+                    Cham.Radius = PartSize.X / 2 - Sub
+                else
+                    Cham = NewInstance("BoxHandleAdornment")
+                    Cham.Parent = Menu.Overlay
+                    Cham.Size   = PartSize + (Inline and NewVector3(-0.1,-0.1,-0.1) or NewVector3(0.1,0.1,0.1))
+                end
+                Cham.ZIndex        = 1
+                Cham.AlwaysOnTop   = Inline
+                ChamSet[k] = Cham
+            end
+            Chams[PartName] = ChamSet
+        end
+        return Chams
+    end
+
+    Esp.UpdateChamsPlayer = function(Data, Visible)
+        if not Visible then
+            for _, Value in next, Data.Chams do Value[1].Visible = false; Value[2].Visible = false end
+            return
+        end
+        local VisibleColorpicker = (Data.Relation == "Priority" and Flags["esp esp settings highlight priorities"] and Flags["esp esp settings highlight priorities"].Value and Flags["esp esp settings highlight priorities color"])
+                                or (Data.Relation == "Friendly" and Flags["esp esp settings highlight friendlies"] and Flags["esp esp settings highlight friendlies"].Value and Flags["esp esp settings highlight friendlies color"])
+                                or Flags["esp players chams visible color"]
+        local InvisibleColorpicker = Flags["esp players chams invisible color"]
+        local InvisibleColor, InvisibleTransparency = InvisibleColorpicker.Color, InvisibleColorpicker.Transparency
+        local VisibleColor, VisibleTransparency     = VisibleColorpicker.Color, VisibleColorpicker.Transparency
+        local Glow      = Flags["esp players glow"].Value
+        local InlineShade   = Enum.AdornShading[Flags["esp players chams shade invisible"].Value]
+        local OutlineShade  = Enum.AdornShading[Flags["esp players chams shade visible"].Value]
+
+        for Index, Value in next, Data.Chams do
+            local BodyPart = Data.BodyParts[Index]
+            local Inline, Outline = Value[1], Value[2]
+            Inline.Adornee    = BodyPart
+            Inline.Transparency = InvisibleTransparency
+            Inline.Color3     = InvisibleColor
+            Inline.AlwaysOnTop = Glow or true
+            Inline.Visible    = BodyPart ~= nil  -- FIX: só mostra se part existe
+            Inline.Shading    = InlineShade
+            Outline.Adornee   = BodyPart
+            Outline.Transparency = VisibleTransparency
+            Outline.Color3    = VisibleColor
+            Outline.ZIndex    = Glow and -1 or 1
+            Outline.AlwaysOnTop = Glow
+            Outline.Visible   = BodyPart ~= nil  -- FIX
+            Outline.Shading   = OutlineShade
+        end
+    end
+
+    Esp.UpdateChamsAll = function()
+        for i = 1, Info.PlayersIndex do
+            Esp.UpdateChamsPlayer(Info.Players[i], Flags["esp players chams"].Value)
+        end
+    end
+
+    -- ─────────────────────────────────────────────────────────────
+    -- ESP STEP — FIX cálculo de box dinâmico
+    -- Usa projeção real do topo da Head e base das pernas
+    -- Health bar FORA do box, Name FORA do box (acima)
+    -- ─────────────────────────────────────────────────────────────
+    local LastStep = 0
+    Esp.Step = function()
+        local Time  = Tick()
+        local Delta = Time - LastStep
+        if Delta < (1 / Flags["esp esp settings refresh rate"].Value) then return end
+        LastStep = Time
+
+        if not Flags["esp players enabled"].Value then
+            for i = 1, Info.PlayersIndex do
+                local Renders = Info.Players[i].Renders
+                Renders.Framework.Visible = false
+                Renders.Arrow.Visible     = false
+                for j = 1, 9 do Renders[j].Visible = false end
+            end
+            return
+        end
+
+        local WTVP          = Camera.WorldToViewportPoint
+        local ShowBox       = Flags["esp players bounding box"].Value
+        local ShowFill      = ShowBox and Flags["esp players filled bounding box"].Value
+        local ShowHealth    = Flags["esp players health bar"].Value
+        local ShowName      = Flags["esp players name"].Value
+        local ShowWeapon    = Flags["esp players held weapon"].Value
+        local ShowDistance  = Flags["esp players distance"].Value
+        local ShowSkeleton  = Flags["esp players skeleton"].Value
+        local ShowRank      = Flags["esp players rank"].Value
+        local ShowArrow     = Flags["esp players out of view"].Value
+
+        local BoxColorpicker     = ShowBox    and Flags["esp players bounding box color"]
+        local BoxFillColorpicker = ShowFill   and Flags["esp players filled bounding box color"]
+        local HealthColorLow     = ShowHealth and Flags["esp players health bar color low"]
+        local HealthColorHigh    = ShowHealth and Flags["esp players health bar color high"]
+        local NameColorpicker    = ShowName   and Flags["esp players name color"]
+        local SkeletonColorpicker = ShowSkeleton and Flags["esp players skeleton color"]
+        local ArrowColorpicker   = ShowArrow  and Flags["esp players arrow color"]
+        local ArrowDynamic       = ShowArrow  and Flags["esp players dynamic arrow size"].Value
+        local ArrowSize          = not ArrowDynamic and Flags["esp players arrow size"].Value
+        local DrawDistance       = Flags["esp esp settings maximum draw distance"].Value
+
+        for i = 1, Info.PlayersIndex do
+            local Data = Info.Players[i]
+
+            if not Data.RootPosition or Data.Distance > DrawDistance then
+                local Renders = Data.Renders
+                Renders.Framework.Visible = false
+                Renders.Arrow.Visible     = false
+                for j = 1, 9 do Renders[j].Visible = false end
+                continue
+            end
+
+            local Renders      = Data.Renders
+            local RootPosition = Data.RootPosition
+            local BodyParts    = Data.BodyParts
+
+            -- FIX: calcular bounds usando extremidades reais do personagem
+            -- Topo = Head topo, Base = pés das legs, Lados = largura do Torso
+            local HeadPart    = BodyParts["Head"]
+            local TorsoPart   = BodyParts["Torso"]
+            local LLegPart    = BodyParts["Left Leg"]
+            local RLegPart    = BodyParts["Right Leg"]
+
+            -- Calcula posição do topo e base usando partes reais
+            local TopWorld, BottomWorld
+
+            if HeadPart and TorsoPart then
+                -- Topo: Head center + metade da altura da head (0.5)
+                TopWorld    = HeadPart.Position + NewVector3(0, 0.6, 0)
+                -- Base: depende de ter as pernas
+                if LLegPart or RLegPart then
+                    local LegPart = LLegPart or RLegPart
+                    BottomWorld = LegPart.Position - NewVector3(0, 1.1, 0)
+                else
+                    -- Fallback sem legs: abaixo do torso
+                    BottomWorld = TorsoPart.Position - NewVector3(0, 2.2, 0)
+                end
+            else
+                -- Fallback: usa RootPosition como base
+                TopWorld    = RootPosition + NewVector3(0, 2.8, 0)
+                BottomWorld = RootPosition - NewVector3(0, 3.2, 0)
+            end
+
+            -- Calcula largura baseada no Torso ou valor padrão
+            local CharWidth = TorsoPart and (BodyPartSizes["Torso"].X * 0.6) or 1.1
+
+            -- Projeção dos 4 cantos do bounding box 3D → 2D
+            local TopLeft     = WTVP(TopWorld    + NewVector3(-CharWidth, 0, 0), false)
+            local TopRight    = WTVP(TopWorld    + NewVector3( CharWidth, 0, 0), false)
+            local BottomLeft  = WTVP(BottomWorld + NewVector3(-CharWidth, 0, 0), false)
+            local BottomRight = WTVP(BottomWorld + NewVector3( CharWidth, 0, 0), false)
+            local TopCenter   = WTVP(TopWorld, false)
+            local BotCenter   = WTVP(BottomWorld, false)
+
+            -- Checa se está na tela
+            local Position, OnScreen = WTVP(RootPosition, true)
+
+            if not OnScreen then
+                if not ShowArrow then
+                    Renders.Framework.Visible = false
+                    Renders.Arrow.Visible     = false
+                    for j = 1, 9 do Renders[j].Visible = false end
+                    continue
+                end
+                local Relative = PointToObjectSpace(CurrentCamera.CFrame, RootPosition)
+                local Angle    = Atan2(-Relative.Y, Relative.X)
+                local Rotation = Deg(Angle)
+                local Radius   = 350
+                local Arrow    = Renders.Arrow
+                local OverridePicker = nil
+                if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
+                    OverridePicker = Flags["esp esp settings highlight priorities color"]
+                elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
+                    OverridePicker = Flags["esp esp settings highlight friendlies color"]
+                end
+                Arrow.ImageColor3     = (OverridePicker and OverridePicker.Color) or ArrowColorpicker.Color
+                Arrow.ImageTransparency = ArrowColorpicker.Transparency
+                Arrow.Position        = NewUDim2(0, ScreenSizeX/2 + Radius*Cos(Rad(Rotation)), 0, ScreenSizeY/2 + Radius*Sin(Rad(Rotation)))
+                Arrow.Rotation        = Rotation + 90
+                Arrow.Visible         = true
+                local Size = ArrowDynamic and Clamp(((Data.Distance-1)/(100-1))*(7-20)+20, 7, 20) or ArrowSize
+                Arrow.Size = NewUDim2(0, Size, 0, Size)
+                Renders.Framework.Visible = false
+                for j = 1, 9 do Renders[j].Visible = false end
+                continue
+            end
+
+            local OverridePicker = nil
+            if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
+                OverridePicker = Flags["esp esp settings highlight priorities color"]
+            elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
+                OverridePicker = Flags["esp esp settings highlight friendlies color"]
+            end
+
+            -- FIX: calcula bounds 2D a partir das projeções dos cantos
+            -- Garante que o box envolve o personagem por fora, não por dentro
+            local MinX = Min(TopLeft.X, TopRight.X, BottomLeft.X, BottomRight.X)
+            local MaxX = Max(TopLeft.X, TopRight.X, BottomLeft.X, BottomRight.X)
+            local MinY = Min(TopLeft.Y, TopRight.Y, BottomLeft.Y, BottomRight.Y)
+            local MaxY = Max(TopLeft.Y, TopRight.Y, BottomLeft.Y, BottomRight.Y)
+
+            -- Adiciona pequeno padding para o box não colar na silhueta
+            local Pad  = 2
+            MinX = Floor(MinX - Pad)
+            MaxX = Floor(MaxX + Pad)
+            MinY = Floor(MinY - Pad)
+            MaxY = Floor(MaxY + Pad)
+
+            local BoxW = Max(MaxX - MinX, 1)
+            local BoxH = Max(MaxY - MinY, 1)
+
+            local Framework = Renders.Framework
+            Framework.Position = NewUDim2(0, MinX, 0, MinY)
+            Framework.Size     = NewUDim2(0, BoxW, 0, BoxH)
+            Framework.Visible  = true
+
+            if ShowBox then
+                local Box, BoxInline, BoxOutline, BoxFill = Renders.Box, Renders.BoxInline, Renders.BoxOutline, Renders.BoxFill
+                Box.Visible         = true
+                Box.Position        = NewUDim2(0, 0, 0, 0)
+                Box.Size            = NewUDim2(1, 0, 1, 0)
+                BoxInline.Enabled   = true
+                BoxInline.Color     = (OverridePicker and OverridePicker.Color) or BoxColorpicker.Color
+                BoxInline.Transparency = BoxColorpicker.Transparency
+                BoxOutline.Enabled  = true
+                BoxOutline.Transparency = BoxColorpicker.Transparency
+                if ShowFill then
+                    BoxFill.Visible = true
+                    BoxFill.BackgroundColor3 = BoxFillColorpicker.Color
+                    BoxFill.BackgroundTransparency = BoxFillColorpicker.Transparency
+                else
+                    BoxFill.Visible = false
+                end
+            else
+                Renders.Box.Visible       = false
+                Renders.BoxInline.Enabled = false
+                Renders.BoxOutline.Enabled = false
+            end
+
+            if ShowHealth then
+                local Percent = Clamp(Data.Health / Max(Data.MaxHealth, 1), 0, 1)
+                local HealthColor = HealthColorLow.Color:Lerp(HealthColorHigh.Color, Percent)
+                -- FIX: HealthOutline fica à esquerda do Framework, tamanho do box height
+                Renders.HealthOutline.Visible   = true
+                Renders.HealthOutline.Position  = NewUDim2(0, -6, 0, 0)
+                Renders.HealthOutline.Size      = NewUDim2(0, 3, 1, 0)
+                Renders.HealthInline.Visible    = true
+                Renders.HealthInline.Size       = NewUDim2(1, 0, Percent, 0)
+                Renders.HealthInline.BackgroundColor3 = HealthColor
+                -- Health bar cresce de baixo pra cima
+                Renders.HealthInline.AnchorPoint = NewVector2(0, 1)
+                Renders.HealthInline.Position    = NewUDim2(0, 0, 1, 0)
+            else
+                Renders.HealthOutline.Visible = false
+                Renders.HealthInline.Visible  = false
+            end
+
+            if ShowName then
+                -- FIX: Name fica acima do framework
+                Renders.Name.Visible      = true
+                Renders.Name.Position     = NewUDim2(0.5, 0, 0, -2)
+                Renders.Name.AnchorPoint  = NewVector2(0.5, 1)
+                Renders.Name.TextColor3   = (OverridePicker and OverridePicker.Color) or NameColorpicker.Color
+                Renders.Name.TextTransparency = NameColorpicker.Transparency
+                Renders.NameShadow.Visible = true
+                Renders.NameShadow.Position = NewUDim2(0.5, 1, 0, -1)
+                Renders.NameShadow.AnchorPoint = NewVector2(0.5, 1)
+                Renders.NameShadow.TextTransparency = NameColorpicker.Transparency
+            else
+                Renders.Name.Visible      = false
+                Renders.NameShadow.Visible = false
+            end
+
+            if ShowWeapon and Data.Weapon then
+                Renders.Weapon.Visible  = true
+                Renders.Weapon.Text     = Data.Weapon
+                Renders.Weapon.Position = NewUDim2(0.5, 0, 1, 3)
+                Renders.Weapon.AnchorPoint = NewVector2(0.5, 0)
+            else
+                Renders.Weapon.Visible = false
+            end
+
+            if ShowDistance then
+                Renders.Distance.Visible   = true
+                Renders.Distance.Text      = (Floor(Data.Distance * 10 + 0.5) / 10) .. "M"
+                Renders.Distance.Position  = Renders.Weapon.Visible and NewUDim2(0.5, 0, 1, 14) or NewUDim2(0.5, 0, 1, 3)
+                Renders.Distance.AnchorPoint = NewVector2(0.5, 0)
+            else
+                Renders.Distance.Visible = false
+            end
+
+            if ShowRank then
+                Renders.Rank.Visible  = true
+                Renders.Rank.Text     = Data.Rank
+                Renders.Rank.Position = NewUDim2(1, 4, 0, 0)
+                Renders.Rank.AnchorPoint = NewVector2(0, 0)
+            else
+                Renders.Rank.Visible = false
+            end
+
+            if ShowSkeleton then
+                local Joints = Data.Joints
+                for j = 1, #Joints do
+                    local PositionA = WTVP(PointToWorldSpace(Joints[j][1].CFrame, SkeletonOffsetsA[j]))
+                    local PositionB = WTVP(PointToWorldSpace(Joints[j][2].CFrame, SkeletonOffsetsB[j]))
+                    local Center    = (NewVector2(PositionA.X,PositionA.Y) + NewVector2(PositionB.X,PositionB.Y)) / 2
+                    local Offset    = NewVector2(PositionB.X,PositionB.Y) - NewVector2(PositionA.X,PositionA.Y)
+                    local Line      = Renders[j]
+                    Line.Position        = NewUDim2(0, Center.X, 0, Center.Y)
+                    Line.Size            = NewUDim2(0, Offset.Magnitude, 0, 1)
+                    Line.Rotation        = Deg(Atan2(Offset.Y, Offset.X))
+                    Line.BackgroundColor3 = (OverridePicker and OverridePicker.Color) or SkeletonColorpicker.Color
+                    Line.Transparency    = SkeletonColorpicker.Transparency
+                    Line.Visible         = true
+                end
+                -- Esconde linhas extras se joints < 9
+                for j = #Joints + 1, 9 do Renders[j].Visible = false end
+            else
+                for j = 1, 9 do Renders[j].Visible = false end
+            end
+
+            Renders.Arrow.Visible = false
+        end
+    end
+
+    Esp.Load = function()
+        Esp.StepConnection = RenderStepped:Connect(Esp.Step)
+        Esp.Loaded = true
+    end
+end
+
+-- ============================================================
+-- VISUALS
+-- ============================================================
+do
+    local ArmNames = {["Right Arm"] = true, ["Left Arm"] = true}
+
+    Visuals.Materials = {
+        ["Ghost"] = Enum.Material.ForceField,
+        ["Flat"]  = Enum.Material.Neon,
+        ["Foil"]  = Enum.Material.Foil,
+        ["Custom"] = Enum.Material.SmoothPlastic,
+        ["Reflective"] = Enum.Material.Glass
+    }
+    Visuals.OriginalLighting = {}
+
+    local Properties = {"Ambient", "OutdoorAmbient", "Brightness", "GlobalShadows"}
+    for i = 1, #Properties do
+        local Property = Properties[i]
+        Visuals.OriginalLighting[Property] = Lighting[Property]
+    end
+
+    Visuals.ApplyTool = function(Tool)
+        if not Tool then return end
+        local Children = GetChildren(Tool)
+        for i = 1, #Children do
+            local Child = Children[i]
+            if Child.ClassName ~= "MeshPart" then continue end
+            if Flags["esp view model weapon chams"] and Flags["esp view model weapon chams"].Value then
+                local Colorpicker = Flags["esp view model weapon chams color"]
+                Child.Color       = Colorpicker.Color
+                Child.Transparency = Colorpicker.Transparency
+                Child.Material    = Visuals.Materials[Flags["esp view model weapon chams material"].Value]
+                Child.TextureID   = ForceFieldAnimations[Flags["esp view model weapon chams animation"].Value]
+            end
+        end
+    end
+
+    Visuals.ApplyArm = function(Arm)
+        if not Arm then return end
+        local Colorpicker = Flags["esp view model arm chams color"]
+        Arm.Color        = Colorpicker.Color
+        Arm.Transparency = Colorpicker.Transparency
+        Arm.Material     = Visuals.Materials[Flags["esp view model arm chams material"].Value]
+    end
+
+    Visuals.OnLightingChanged = function()
+        if Flags["visuals world ambient"] and Flags["visuals world ambient"].Value then
+            Lighting.Ambient        = Flags["visuals world ambient indoor color"].Color
+            Lighting.OutdoorAmbient = Flags["visuals world ambient outdoor color"].Color
+        else
+            Lighting.Ambient        = Visuals.OriginalLighting.Ambient
+            Lighting.OutdoorAmbient = Visuals.OriginalLighting.OutdoorAmbient
+        end
+        if Flags["visuals world force time"] and Flags["visuals world force time"].Value then
+            Lighting.ClockTime = Flags["visuals world time of day"].Value
+        end
+        if Flags["visuals world custom brightness"] and Flags["visuals world custom brightness"].Value then
+            local BrightnessMode = Flags["visuals world brightness mode"].Value
+            if BrightnessMode == "Dimmed" then
+                Lighting.Brightness = Visuals.OriginalLighting.Brightness / 4
+            elseif BrightnessMode == "Nightmode" then
+                Lighting.Brightness = 0
+            else
+                Lighting.Brightness    = 1
+                Lighting.GlobalShadows = false
+            end
+        else
+            Lighting.Brightness    = Visuals.OriginalLighting.Brightness
+            Lighting.GlobalShadows = Visuals.OriginalLighting.GlobalShadows
+        end
+    end
+
+    Visuals.Load = function()
+        Lighting.LightingChanged:Connect(Visuals.OnLightingChanged)
+        CurrentCamera.ChildAdded:Connect(function(Child)
+            if Child.Name ~= "ViewModel" or Child.ClassName ~= "Model" then return end
+            Child.ChildAdded:Connect(function(ViewModelChild)
+                if ViewModelChild.ClassName == "Tool" then
+                    Visuals.ApplyTool(ViewModelChild)
+                elseif ViewModelChild.ClassName == "Part" and ArmNames[ViewModelChild.Name] then
+                    Visuals.ApplyArm(ViewModelChild)
+                end
+            end)
+            Visuals.ApplyTool(FindFirstChildOfClass(Child, "Tool"))
+            Visuals.ApplyArm(FindFirstChild(Child, "Right Arm"))
+            Visuals.ApplyArm(FindFirstChild(Child, "Left Arm"))
+        end)
+        Lighting.LightingStyle = Enum.LightingStyle.Soft
+        Lighting.PrioritizeLightingQuality = false
+        Visuals.OnLightingChanged()
+        Visuals.Loaded = true
+    end
+end
+
+-- ============================================================
+-- MISC
+-- ============================================================
+do
+    local Garbage = getgc(true)
+    for i = 1, #Garbage do
+        local Current = Garbage[i]
+        if typeof(Current) == "table" and typeof(rawget(Current, "spring")) == "table" then
+            local SpringModule = rawget(Current, "spring")
+            if typeof(rawget(SpringModule, "new")) == "function" then
+                local OldNewSpring = SpringModule.new
+                SpringModule.new = function(...)
+                    local Spring = OldNewSpring(...)
+                    if SFind(Traceback(), "LoadGun", 1, true) or SFind(Traceback(), "Gun", 1, true) then
+                        local OldAccelerate = Spring.accelerate
+                        Spring.accelerate = function(Self, Impulse)
+                            if Flags["recoil scale"] and Flags["recoil scale"].Value then
+                                Impulse = NewVector3(
+                                    Impulse.X * (Flags["recoil scale pitch"] and Flags["recoil scale pitch"].Value or 100) / 100,
+                                    Impulse.Y * (Flags["recoil scale yaw"]   and Flags["recoil scale yaw"].Value   or 100) / 100,
+                                    Impulse.Z
+                                )
+                            end
+                            return OldAccelerate(Self, Impulse)
+                        end
+                    end
+                    return Spring
+                end
+                break
+            end
+        end
+    end
+    Garbage = nil
+end
+
+-- ============================================================
+-- MENU SECTIONS
+-- ============================================================
+do
+    do
+        local Section = Menu.Window.Pages[3]:CreateSection({Name = "Aimbot", Side = 1, Length = 1}) do
+            Section:CreateToggle({Name = "Enabled", Flag = "legit aim assist enabled"}):CreateHotkey({Flag = "legit aim assist enabled key", Mode = "On hotkey"})
+
+            Section:CreateDropdown({
+                Name    = "Mode",
+                Flag    = "legit aim assist mode",
+                Value   = "Camera",
+                Options = {"Camera", "Mouse"}
+            })
+
+            Section:CreateSlider({Name = "Camera FOV", Flag = "legit aim assist fov", Suffix = "°", Value = 10, Minimum = 0, Maximum = 90, Decimals = 0.1})
+            Section:CreateSlider({Name = "Mouse FOV radius (px)", Flag = "legit aim assist mouse fov radius", Suffix = "px", Value = 80, Minimum = 10, Maximum = 400})
+            Section:CreateSlider({Name = "Speed", Flag = "legit aim assist speed", Suffix = "%", Value = 50, Minimum = 1, Maximum = 100})
+            Section:CreateDropdown({Name = "Smoothing", Flag = "legit aim assist smoothing", Value = "Linear", Options = {"Linear", "Exponential"}})
+            Section:CreateSlider({Name = "Enemy switching delay", Flag = "legit aim assist enemy switching delay", Suffix = "ms", Value = 100, Minimum = 0, Maximum = 2000, Custom = {"Off", 0}})
+            Section:CreateSlider({Name = "Accuracy", Flag = "legit aim assist accuracy", Suffix = "%", Value = 60, Minimum = 0, Maximum = 100})
+            Section:CreateDropdown({Name = "Hitscan priority", Flag = "legit aim assist hitscan priority", Value = "Closest", Options = {"Closest", "Head", "Body"}})
+            Section:CreateCombobox({Name = "Hitscan hitboxes", Flag = "legit aim assist hitscan points", Value = {"Head", "Body", "Arms", "Legs"}, Options = {"Head", "Body", "Arms", "Legs"}})
+            Section:CreateToggle({Name = "Adjust for bullet drop", Flag = "legit aim assist adjust for bullet drop"})
+            Section:CreateToggle({Name = "Adjust for target movement", Flag = "legit aim assist adjust for target movement"})
+            Section:CreateToggle({Name = "Visualize FOV", Flag = "legit aim assist visualize fov"})
+            Section:CreateToggle({Name = "Wall check", Flag = "legit aim assist wall check", Value = true})
+        end
+
+        local Section = Menu.Window.Pages[3]:CreateSection({Name = "Triggerbot", Side = 2, Length = 0.4}) do
+            Section:CreateToggle({Name = "Enabled", Flag = "legit trigger bot enabled"}):CreateHotkey({Flag = "legit trigger bot enabled key", Mode = "On hotkey"})
+            Section:CreateCombobox({Name = "Triggerbot hitboxes", Flag = "legit trigger bot triggerbot hitboxes", Value = {"Head", "Body", "Arms", "Legs"}, Options = {"Head", "Body", "Arms", "Legs"}})
+            Section:CreateToggle({Name = "Magnet triggerbot", Flag = "legit trigger bot magnet triggerbot"})
+            Section:CreateSlider({Name = "Magnet FOV", Flag = "legit trigger bot magnet fov", Suffix = "°", Value = 10, Minimum = 0, Maximum = 90, Decimals = 0.1})
+            Section:CreateSlider({Name = "Magnet speed", Flag = "legit trigger bot magnet speed", Suffix = "%", Value = 50, Minimum = 1, Maximum = 100})
+            Section:CreateSlider({Name = "Magnet accuracy", Flag = "legit trigger bot magnet accuracy", Suffix = "%", Value = 60, Minimum = 0, Maximum = 100})
+            Section:CreateDropdown({Name = "Magnet priority", Flag = "legit trigger bot magnet priority", Value = "Closest", Options = {"Closest", "Head", "Body"}})
+        end
+
+        local Section = Menu.Window.Pages[3]:CreateSection({Name = "Bullet Redirection (game-specific)", Side = 2, Length = 0.6}) do
+            Section:CreateLabel({Text = "Bullet Redirection requires game-specific\nhook — unavailable in universal mode."})
+        end
+    end
+
+    -- VISUALS
+    do
+        local Section = Menu.Window.Pages[4]:CreateSection({Name = "Players ESP", Side = 1, Length = 0.61}) do
+            Section:CreateHotkey({Name = "Activation", Flag = "esp players enabled", Mode = "Always on"})
+            Section:CreateToggle({Name = "Bounding box", Flag = "esp players bounding box"}):CreateColorpicker({Flag = "esp players bounding box color", Color = NewRGB(200,200,200), Transparency = 0.35})
+            Section:CreateToggle({Name = "Filled bounding box", Flag = "esp players filled bounding box"}):CreateColorpicker({Flag = "esp players filled bounding box color", Color = NewRGB(6,6,6), Transparency = 0.8})
+
+            local Toggle = Section:CreateToggle({Name = "Health bar", Flag = "esp players health bar"})
+            Toggle:CreateColorpicker({Flag = "esp players health bar color low",  Color = NewRGB(255,100,100)})
+            Toggle:CreateColorpicker({Flag = "esp players health bar color high", Color = NewRGB(100,255,100)})
+
+            Section:CreateToggle({Name = "Name",     Flag = "esp players name"}):CreateColorpicker({Flag = "esp players name color", Color = NewRGB(255,255,255)})
+            Section:CreateToggle({Name = "Rank",     Flag = "esp players rank"})
+            Section:CreateToggle({Name = "Held weapon", Flag = "esp players held weapon"})
+            Section:CreateToggle({Name = "Distance", Flag = "esp players distance"})
+            Section:CreateToggle({Name = "Skeleton", Flag = "esp players skeleton"}):CreateColorpicker({Flag = "esp players skeleton color", Color = NewRGB(183,190,255), Transparency = 0.2})
+            Section:CreateToggle({Name = "Off-screen arrow", Flag = "esp players out of view"}):CreateColorpicker({Flag = "esp players arrow color", Color = NewRGB(255,255,255), Transparency = 0})
+            Section:CreateSlider({Name = "Arrow distance", Flag = "esp players arrow distance", Suffix = "%", Value = 30, Minimum = 1, Maximum = 100})
+            Section:CreateSlider({Name = "Arrow size",     Flag = "esp players arrow size",     Value = 10,  Minimum = 6, Maximum = 20})
+            Section:CreateToggle({Name = "Dynamic arrow size", Flag = "esp players dynamic arrow size"})
+        end
+
+        local Section = Menu.Window.Pages[4]:CreateSection({Name = "Colored Models", Side = 1, Length = 0.39}) do
+            local Toggle = Section:CreateToggle({Name = "Chams", Flag = "esp players chams", Callback = Esp.UpdateChamsAll})
+            Toggle:CreateColorpicker({Flag = "esp players chams invisible color", Color = NewRGB(0,0,0),       Transparency = 0.6, Callback = Esp.UpdateChamsAll})
+            Toggle:CreateColorpicker({Flag = "esp players chams visible color",   Color = NewRGB(183,190,255), Transparency = 0.4, Callback = Esp.UpdateChamsAll})
+            Section:CreateDropdown({Flag = "esp players chams shade invisible", Value = "Default", Options = {"Default","Shaded","XRayShaded","AlwaysOnTop"}, Callback = Esp.UpdateChamsAll})
+            Section:CreateDropdown({Flag = "esp players chams shade visible",   Value = "Default", Options = {"Default","Shaded","XRayShaded","AlwaysOnTop"}, Callback = Esp.UpdateChamsAll})
+            Section:CreateToggle({Name = "Glow", Flag = "esp players glow", Callback = Esp.UpdateChamsAll})
+            Section:CreateToggle({Name = "Weapon chams", Flag = "esp view model weapon chams", Value = true}):CreateColorpicker({Flag = "esp view model weapon chams color", Color = NewRGB(106,136,213), Transparency = 0.55})
+            Section:CreateDropdown({Value = "Ghost", Flag = "esp view model weapon chams material", Options = {"Ghost","Flat","Foil","Custom","Reflective"}})
+            Section:CreateDropdown({Value = "Off",   Flag = "esp view model weapon chams animation", Options = GetTableIndexes(ForceFieldAnimations)})
+            Section:CreateSlider({Name = "Reflectance", Flag = "esp view model weapon reflectance", Value = 0, Minimum = 0, Maximum = 128})
+            Section:CreateToggle({Name = "Arm chams", Flag = "esp view model arm chams", Value = true}):CreateColorpicker({Flag = "esp view model arm chams color", Color = NewRGB(181,179,253), Transparency = 0.55})
+            Section:CreateDropdown({Value = "Ghost", Flag = "esp view model arm chams material", Options = {"Ghost","Flat","Foil","Custom","Reflective"}})
+        end
+
+        local Section = Menu.Window.Pages[4]:CreateSection({Name = "ESP Settings", Side = 2, Length = 0.27}) do
+            Section:CreateToggle({Name = "Highlight friendlies", Flag = "esp esp settings highlight friendlies", Value = true, Callback = Esp.UpdateChamsAll}):CreateColorpicker({Flag = "esp esp settings highlight friendlies color", Color = NewRGB(0,200,0), Transparency = 0.55, Callback = Esp.UpdateChamsAll})
+            Section:CreateToggle({Name = "Highlight priorities", Flag = "esp esp settings highlight priorities", Value = true, Callback = Esp.UpdateChamsAll}):CreateColorpicker({Flag = "esp esp settings highlight priorities color", Color = NewRGB(255,200,69), Transparency = 0.55, Callback = Esp.UpdateChamsAll})
+            Section:CreateSlider({Name = "Refresh rate",       Flag = "esp esp settings refresh rate",         Suffix = "fps", Value = 144, Minimum = 60, Maximum = 144})
+            Section:CreateSlider({Name = "Maximum draw distance", Flag = "esp esp settings maximum draw distance", Suffix = "m", Value = 2500, Minimum = 50, Maximum = 2500, Custom = {"inf.", 2500}})
+        end
+
+        local Section = Menu.Window.Pages[4]:CreateSection({Name = "Effects", Side = 2, Length = 0.27}) do
+            local Toggle = Section:CreateToggle({Name = "Ambient", Flag = "visuals world ambient", Value = false})
+            Toggle:CreateColorpicker({Flag = "visuals world ambient indoor color",  Color = NewRGB(117,76,236)})
+            Toggle:CreateColorpicker({Flag = "visuals world ambient outdoor color", Color = NewRGB(117,76,236)})
+            Section:CreateToggle({Name = "Force time", Flag = "visuals world force time", Value = false})
+            Section:CreateSlider({Name = "Time of day", Flag = "visuals world time of day", Value = 6, Minimum = 0, Maximum = 24})
+            Section:CreateToggle({Name = "Custom brightness", Flag = "visuals world custom brightness", Value = false})
+            Section:CreateDropdown({Name = "Brightness mode", Flag = "visuals world brightness mode", Options = {"Dimmed","Nightmode","Full bright"}, Value = "Dimmed"})
+            Section:CreateDropdown({
+                Name = "Style", Flag = "visuals world style", Options = {"Soft","Realistic"}, Value = "Soft",
+                Callback = function(Style) Lighting.LightingStyle = Enum.LightingStyle[Style] end
+            })
+        end
+
+        local Section = Menu.Window.Pages[4]:CreateSection({Name = "Bullet Tracers", Side = 2, Length = 0.23}) do
+            Section:CreateToggle({Name = "Enabled", Flag = "visuals bullet tracers enabled", Value = false}):CreateColorpicker({Flag = "visuals bullet tracers color", Color = NewRGB(255, 140, 0), Transparency = 0})
+            Section:CreateToggle({Name = "2D Overlay line", Flag = "visuals bullet tracers 2d overlay", Value = true})
+            Section:CreateSlider({Name = "Thickness (3D)", Flag = "visuals bullet tracers thickness", Value = 6, Minimum = 1, Maximum = 20, Suffix = "cm"})
+            Section:CreateSlider({Name = "Lifetime", Flag = "visuals bullet tracers lifetime", Value = 35, Minimum = 5, Maximum = 100, Suffix = "/100s"})
+        end
+
+        local Section = Menu.Window.Pages[4]:CreateSection({Name = "Hit Effects", Side = 2, Length = 0.23}) do
+            Section:CreateToggle({Name = "Enabled", Flag = "visuals hit effects enabled", Value = false}):CreateColorpicker({Flag = "visuals hit effects color", Color = NewRGB(255, 30, 30), Transparency = 0})
+            Section:CreateSlider({Name = "Ring size", Flag = "visuals hit effects size", Value = 50, Minimum = 10, Maximum = 120, Suffix = "px"})
+            Section:CreateToggle({Name = "Damage numbers", Flag = "visuals hit effects damage numbers", Value = true})
+        end
+    end
+
+    -- MISC
+    do
+        local Section = Menu.Window.Pages[5]:CreateSection({Name = "Weapon Modifications", Side = 1, Length = 0.5}) do
+            Section:CreateToggle({Name = "Recoil scale (P/Y)", Flag = "recoil scale"})
+            Section:CreateSlider({Flag = "recoil scale pitch", Value = 100, Minimum = 0, Maximum = 100, Suffix = "%"})
+            Section:CreateSlider({Flag = "recoil scale yaw",   Value = 100, Minimum = 0, Maximum = 100, Suffix = "%"})
+        end
+
+        local Section = Menu.Window.Pages[5]:CreateSection({Name = "Grenade Helper", Side = 1, Length = 0.5}) do
+            Section:CreateToggle({Name = "Enabled", Flag = "misc grenade helper enabled"})
+                :CreateHotkey({Flag = "misc grenade helper hotkey", Mode = "On hotkey",
+                Callback = function(Active)
+                    if not Active then return end
+                    if not Flags["misc grenade helper enabled"].Value then return end
+                    local ClosestPlayer, ClosestAngle = nil, 360
+                    do
+                        local CameraCFrame     = CurrentCamera.CFrame
+                        local CameraPosition   = CameraCFrame.Position
+                        local CameraLookVector = CameraCFrame.LookVector
+                        local RadFov = Rad(Flags["misc grenade helper fov"].Value)
+                        for i = 1, Info.PlayersIndex do
+                            local Data = Info.Players[i]
+                            if not Data.RootPosition then continue end
+                            local Angle = Acos(Clamp(Dot(CameraLookVector, (Data.RootPosition - CameraPosition).Unit), -1, 1)) * 2
+                            if Angle > RadFov or Angle > ClosestAngle then continue end
+                            ClosestAngle  = Angle
+                            ClosestPlayer = Data
+                        end
+                    end
+                    if not ClosestPlayer then return end
+                    Wrap(function()
+                        Wait()
+                        local AimDot = NewInstance("Frame")
+                        AimDot.Parent = Menu.Overlay
+                        AimDot.Size   = NewUDim2(0,5,0,5)
+                        AimDot.Position = NewUDim2(0.5,-50,0.5,-50)
+                        AimDot.BackgroundColor3 = Menu.Theme.Accent
+                        AimDot.Visible = false
+                        local Corner = NewInstance("UICorner"); Corner.Parent = AimDot; Corner.CornerRadius = UDim.new(1,0)
+                        local Stroke  = NewInstance("UIStroke"); Stroke.Parent = AimDot; Stroke.Thickness = 1; Stroke.Color = NewRGB(0,0,0)
+                        local Connection; Connection = RenderStepped:Connect(function(DeltaTime)
+                            if not UserInputService:IsKeyDown(Flags["misc grenade helper hotkey"].Key) then
+                                Connection:Disconnect(); Destroy(AimDot); return
+                            end
+                            if not LocalPlayer.Character then return end
+                            local Head = FindFirstChild(LocalPlayer.Character, "Head")
+                            if not Head then return end
+                            local Origin = Head.Position
+                            local Goal   = ClosestPlayer.RootPosition - NewVector3(0,3.5,0)
+                            if Flags["misc grenade helper adjust for target movement"].Value then
+                                Goal = Mathematics.SolvePrediction(Origin, Goal, ClosestPlayer.RootPart.Velocity, 150)
+                            end
+                            local Velocity = Mathematics.ResolveGrenadeVelocity(Origin, Goal, 150, Workspace.Gravity * 0.55)
+                            if not Velocity then AimDot.Visible = false; return end
+                            if Flags["misc grenade helper automatic aim"].Value then
+                                CurrentCamera.CFrame = CurrentCamera.CFrame:Lerp(
+                                    NewCFrame(CurrentCamera.CFrame.Position, CurrentCamera.CFrame.Position + Velocity.Unit),
+                                    Flags["misc grenade helper speed"].Value / 10 * DeltaTime
+                                )
+                            end
+                            local Position, OnScreen = Camera.WorldToViewportPoint(Origin + Velocity.Unit * 9999, true)
+                            if OnScreen then
+                                AimDot.Position = NewUDim2(0, Position.X-(AimDot.AbsoluteSize.X/2), 0, Position.Y-(AimDot.AbsoluteSize.Y/2))
+                                AimDot.Visible  = true
+                            else
+                                AimDot.Visible = false
+                            end
+                        end)
+                    end)()
+                end
+            })
+            Section:CreateSlider({Name = "Maximum FOV", Flag = "misc grenade helper fov", Suffix = "°", Value = 10, Minimum = 0, Maximum = 15})
+            Section:CreateToggle({Name = "Automatic aim", Flag = "misc grenade helper automatic aim"})
+            Section:CreateSlider({Name = "Speed", Flag = "misc grenade helper speed", Value = 25, Minimum = 1, Maximum = 100, Suffix = "%"})
+            Section:CreateToggle({Name = "Adjust for target movement", Flag = "misc grenade helper adjust for target movement"})
+        end
+
+        local Section = Menu.Window.Pages[5]:CreateSection({Name = "Settings", Side = 2, Length = 0.5}) do
+            Section:CreateColorpicker({
+                Name = "Menu color", Flag = "menu color", Color = Menu.Theme["Accent"],
+                Callback = function(Color) Menu:ChangeThemeColor("Accent", Color) end
+            })
+            Section:CreateToggle({Name = "Lock menu layout"})
+            Section:CreateButton({Name = "Reset menu layout", Confirm = true})
+        end
+    end
+
+    -- PLAYERS
+    do
+        local SelectedPlayerData
+        local WhitelistToggle
+        local PriorityToggle
+
+        local Section = Menu.Window.Pages[7]:CreateSection({Name = "Players", Side = 1, Length = 1}) do
+            local PlayersList = Section:CreateSearchList({
+                Length  = 409,
+                Options = {},
+                Callback = function(SelectedUsername)
+                    SelectedPlayerData = Info.Players[SelectedUsername]
+                    if not SelectedPlayerData then return end
+                    WhitelistToggle:SetValue(SelectedPlayerData.Relation == "Friendly", true)
+                    PriorityToggle:SetValue(SelectedPlayerData.Relation == "Priority",  true)
+                end
+            })
+
+            Section:CreateButton({Name = "Reset all", Callback = function()
+                for i = 1, Info.PlayersIndex do
+                    local Data = Info.Players[i]
+                    Data.Relation = nil
+                    WhitelistToggle:SetValue(false, true)
+                    PriorityToggle:SetValue(false, true)
+                end
+            end})
+
+            task.spawn(function()
+                repeat Wait() until Info.Loaded
+                for i = 1, Info.PlayersIndex do PlayersList:AddOption(Info.Players[i].Name) end
+                PlayerAdded:Connect(function(Player) PlayersList:AddOption(Player.Name) end)
+                PlayerRemoved:Connect(function(Player) PlayersList:RemoveOption(Player.Name) end)
+            end)
+        end
+
+        local Section = Menu.Window.Pages[7]:CreateSection({Name = "Adjustments", Side = 2, Length = 1}) do
+            WhitelistToggle = Section:CreateToggle({Name = "Add to whitelist", Callback = function(Enabled)
+                if not SelectedPlayerData then return end
+                SelectedPlayerData.Relation = Enabled and "Friendly" or nil
+            end})
+            PriorityToggle = Section:CreateToggle({Name = "High priority", Callback = function(Enabled)
+                if not SelectedPlayerData then return end
+                SelectedPlayerData.Relation = Enabled and "Priority" or nil
+            end})
+        end
+    end
+
+    -- CONFIG
+    do
+        local Section = Menu.Window.Pages[8]:CreateSection({Name = "Presets", Side = 1, Length = 1}) do
+            local PresetList
+            local PresetName
+
+            PresetList = Section:CreateList({
+                Options  = Menu:GetConfigs("Skeet/Universal/Configurations"),
+                Callback = function(Name) PresetName:SetValue(Name) end
+            })
+
+            PresetName = Section:CreateTextbox()
+
+            Section:CreateButton({Name = "Load", Confirm = true, Callback = function()
+                Menu:LoadConfig("Skeet/Universal/Configurations/" .. PresetList.Value .. ".cfg")
+                Menu:CreateNotification({Text = "loaded config " .. PresetList.Value .. "!", LifeTime = 5, Priority = 1})
+            end})
+
+            Section:CreateButton({Name = "Save", Confirm = true, Callback = function()
+                local Path = "Skeet/Universal/Configurations/" .. PresetName.Value .. ".cfg"
+                Menu:SaveConfig(Path)
+                Menu:CreateNotification({Text = "saved config " .. PresetName.Value .. "!", LifeTime = 5, Priority = 1})
+                if isfile(Path) then PresetList:AddOption(PresetName.Value) end
+            end})
+
+            Section:CreateButton({Name = "Delete", Confirm = true, Callback = function()
+                local Path = "Skeet/Universal/Configurations/" .. PresetList.Value .. ".cfg"
+                if isfile(Path) then delfile(Path); PresetList:RemoveOption(PresetList.Value) end
+            end})
+
+            Section:CreateButton({Name = "Reset", Confirm = true})
+            Section:CreateButton({Name = "Import from clipboard", Confirm = true, Callback = function() Menu:ImportClipboard() end})
+            Section:CreateButton({Name = "Export to clipboard", Confirm = true, Callback = function()
+                Menu:ExportClipboard("Skeet/Universal/Configurations/" .. PresetList.Value .. ".cfg")
+            end})
+        end
+
+        local Section = Menu.Window.Pages[8]:CreateSection({Name = "Lua", Side = 2, Length = 1}) do
+            Section:CreateToggle({Name = "Enabled", Value = true})
+            Section:CreateToggle({Name = "Allow unsafe scripts"})
+            Section:CreateButton({Name = "Reload active scripts"})
+            Section:CreateLabel({Text = "Universal build — game-independent"})
+            Section:CreateToggle({Name = "Load on startup"})
+            Section:CreateButton({Name = "Load script"})
+        end
+    end
+end
+
+-- ============================================================
+-- INITIALIZE
+-- ============================================================
+do
+    Info.Load()
+    Esp.Load()
+    Visuals.Load()
+
+    local LoadEnd  = Tick()
+    local LoadTime = LoadEnd - LoadStart
+
+    Menu:CreateNotification({Text = "universal build loaded in " .. tostring(Floor(LoadTime * 1000 + 0.5) / 1000) .. "s!", LifeTime = 15})
+    Menu:CreateNotification({Text = "press home, delete or backquote to open the menu!", LifeTime = 15})
+    Menu:CreateNotification({Text = "bullet tracers + hit effects active\nenable in Visuals tab!", LifeTime = 10})
+
+    if LInfo.Character then
+        Menu:CreateNotification({Text = "tip: run on loading screen for best results", LifeTime = 15})
+    end
+end
