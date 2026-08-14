@@ -799,7 +799,7 @@ end
 
 -- ============================================================
 -- INFO  (universal player tracking)
--- FIX: BodyParts populate independently of chams state
+-- FIX: BodyParts populate independente do estado dos chams
 -- ============================================================
 do
     Info.Players      = {}
@@ -837,10 +837,9 @@ do
                 elseif ClassName == "ForceField" then
                     Data.IsForceField = true
                 elseif ClassName == "Part" and BodyPartList[Child.Name] then
-                    -- FIX: always register parts regardless of chams
+                    -- FIX: registra parts sempre, independente de chams
                     Data.BodyParts[Child.Name] = Child
                     Data.UpdateJoints()
-                    -- update chams adornee if chams active
                     if Flags["esp players chams"] and Flags["esp players chams"].Value then
                         local ChamSet = Data.Chams[Child.Name]
                         if ChamSet then
@@ -899,7 +898,7 @@ do
                 Data.BodyParts   = {}
             end)
 
-            -- FIX: scan ALL children unconditionally, not just when chams enabled
+            -- FIX: scan de todos os filhos incondicionalmente
             local Children = GetChildren(Data.Character)
             for i = 1, #Children do
                 local Child     = Children[i]
@@ -1024,9 +1023,7 @@ end
 
 -- ============================================================
 -- LEGIT
--- FIX 1: Aimbot speed — linear mode não depende mais de DeltaTime puro
--- FIX 2: Hitbox priority — filtra por selected hitboxes primeiro, priority second
--- FIX 3: Enemy detection — não depende mais de chams pra ter BodyParts
+-- FIX: BodyParts detectados independente dos chams
 -- ============================================================
 do
     Legit.CurrentTarget  = nil
@@ -1039,19 +1036,18 @@ do
         ["Legs"] = {"Right Leg", "Left Leg"}
     }
 
-    -- FIX: mapeamento direto de priority name -> part name
     Legit.PriorityPartMap = {
-        ["Head"] = "Head",
-        ["Body"] = "Torso",
-        ["Closest"] = nil  -- nil = sem priority filter
+        ["Head"]    = "Head",
+        ["Body"]    = "Torso",
+        ["Closest"] = nil
     }
 
     Legit.PointSizes = {
-        ["Head"] = NewVector3(1,1,1),
-        ["Torso"] = NewVector3(2,2,1),
-        ["Left Arm"] = NewVector3(1,2,1),
+        ["Head"]      = NewVector3(1,1,1),
+        ["Torso"]     = NewVector3(2,2,1),
+        ["Left Arm"]  = NewVector3(1,2,1),
         ["Right Arm"] = NewVector3(1,2,1),
-        ["Left Leg"] = NewVector3(1,2,1),
+        ["Left Leg"]  = NewVector3(1,2,1),
         ["Right Leg"] = NewVector3(1,2,1)
     }
 
@@ -1060,7 +1056,6 @@ do
     RayParamsWall.RespectCanCollide = false
     Legit.RayParams = RayParamsWall
 
-    -- Mouse mode helpers
     Legit.GetMousePixelAngle = function(WorldPosition)
         local Screen, OnScreen = Camera.WorldToViewportPoint(WorldPosition, false)
         if Screen.Z <= 0 then return nil end
@@ -1155,7 +1150,6 @@ do
         return false
     end
 
-    -- FIX: TranslatePoints retorna lista flat de part names
     Legit.TranslatePoints = function(Points)
         local Temporary = {}
         for i = 1, #Points do
@@ -1178,12 +1172,6 @@ do
         )
     end
 
-    -- ─────────────────────────────────────────────────────────────
-    -- PROCESS AIM ASSIST — FIXED
-    -- FIX 1: Speed linear não depende de DeltaTime (instantâneo em 100%)
-    -- FIX 2: Priority só filtra dentro dos hitboxes selecionados
-    -- FIX 3: Detecta todos os players, não só os com chams
-    -- ─────────────────────────────────────────────────────────────
     Legit.ProcessAimAssist = function(DeltaTime)
         local AssistEnabled = Flags["legit aim assist enabled"] and Flags["legit aim assist enabled"].Value
                            and Flags["legit aim assist enabled key"] and Flags["legit aim assist enabled key"].Value
@@ -1202,13 +1190,11 @@ do
         local CameraPosition   = CameraCFrame.Position
         local CameraLookVector = CameraCFrame.LookVector
 
-        -- Se já temos target, processa suavização
         if Legit.CurrentTarget then
             local CurrentTarget = Legit.CurrentTarget
             local CurrentPart   = CurrentTarget.Part
             local CurrentData   = CurrentTarget.Data
 
-            -- Verifica se a part ainda existe e é válida
             if not CurrentPart or not CurrentPart.Parent then
                 Legit.CurrentTarget = nil; return
             end
@@ -1234,24 +1220,12 @@ do
                 Legit.PreviousTarget.Data = CurrentTarget.Data
                 Legit.PreviousTarget.Tick = Tick()
 
-                -- FIX: cálculo de speed corrigido
-                -- Speed 1-100 → 0.01 a 1.0 de lerp factor por frame
-                -- Linear: speed/100 por frame (100% = instantâneo)
-                -- Exponential: suavização com curva
                 local Speed = (IsMagnet and Flags["legit trigger bot magnet speed"].Value or Flags["legit aim assist speed"].Value) / 100
                 local Smoothing
 
                 if Flags["legit aim assist smoothing"] and Flags["legit aim assist smoothing"].Value == "Linear" then
-                    -- FIX: Linear agora é direto — speed=100% chega instantâneo
-                    -- Normalizado: speed=50 → ~3 frames pra chegar, speed=100 → imediato
-                    Smoothing = Clamp(Speed * 3 * DeltaTime * 60, 0, 1)
-                    -- Clamp(speed * velocidade_base * frames_normalizados, 0, 1)
-                    -- Em 60fps: speed=100 → Clamp(3.0, 0, 1) = 1.0 (instantâneo)
-                    -- Em 60fps: speed=50  → Clamp(1.5, 0, 1) = 1.0 ainda muito rápido
-                    -- Ajuste: base 0.5 pra dar range real
                     Smoothing = Clamp(Speed * 1.5 * DeltaTime * 60, 0, 1)
                 else
-                    -- Exponential: preserva comportamento original mas mais responsivo
                     Smoothing = 1 - Exp(-Speed * 8 * DeltaTime)
                 end
 
@@ -1259,10 +1233,8 @@ do
                     local Screen, _ = Camera.WorldToViewportPoint(AimPosition, false)
                     if Screen.Z > 0 then
                         local MousePos   = UserInputService:GetMouseLocation()
-                        local TargetX    = Screen.X
-                        local TargetY    = Screen.Y
-                        local NewMouseX  = MousePos.X + (TargetX - MousePos.X) * Smoothing
-                        local NewMouseY  = MousePos.Y + (TargetY - MousePos.Y) * Smoothing
+                        local NewMouseX  = MousePos.X + (Screen.X - MousePos.X) * Smoothing
+                        local NewMouseY  = MousePos.Y + (Screen.Y - MousePos.Y) * Smoothing
                         mousemoveabs(NewMouseX, NewMouseY)
                     end
                 else
@@ -1273,18 +1245,14 @@ do
             Legit.CurrentTarget = nil; return
         end
 
-        -- Seleção do melhor target
         local Enemies, EnemiesIndex = {}, 0
 
         if IsMouseMode then
             local MousePixelRadius = Flags["legit aim assist mouse fov radius"] and Flags["legit aim assist mouse fov radius"].Value or 80
-
-            -- FIX: itera todos os players sem depender de chams
             for i = 1, Info.PlayersIndex do
                 local Data = Info.Players[i]
                 local RootPosition = Data.RootPosition
                 if not RootPosition or Data.IsForceField or Data.Relation == "Friendly" then continue end
-                -- FIX: checa se player tem body parts registradas (não depende de chams)
                 if not next(Data.BodyParts) then continue end
                 local PixelDist = Legit.GetMousePixelAngle(RootPosition)
                 if PixelDist and PixelDist <= MousePixelRadius then
@@ -1298,7 +1266,6 @@ do
                 local Data = Info.Players[i]
                 local RootPosition = Data.RootPosition
                 if not RootPosition or Data.IsForceField or Data.Relation == "Friendly" then continue end
-                -- FIX: checa body parts sem depender de chams
                 if not next(Data.BodyParts) then continue end
                 if Acos(Clamp(Dot(CameraLookVector, (RootPosition - CameraPosition).Unit), -1, 1)) * 2 > RadFov then continue end
                 EnemiesIndex += 1
@@ -1308,16 +1275,12 @@ do
 
         if EnemiesIndex < 1 then return end
 
-        -- FIX: obtém hitboxes selecionados como lista de part names
         local SelectedHitboxGroups = IsMagnet and Flags["legit trigger bot triggerbot hitboxes"].Value or Flags["legit aim assist hitscan points"].Value
         local HitscanPoints = Legit.TranslatePoints(SelectedHitboxGroups)
 
-        -- FIX: priority name → part name (dentro dos hitboxes selecionados)
         local PriorityStr = IsMagnet and Flags["legit trigger bot magnet priority"].Value or Flags["legit aim assist hitscan priority"].Value
-        local HitscanPriority = Legit.PriorityPartMap[PriorityStr]  -- nil se "Closest"
+        local HitscanPriority = Legit.PriorityPartMap[PriorityStr]
 
-        -- FIX: valida que a priority part está nos hitboxes selecionados
-        -- Ex: se só "Head" selecionado e priority="Body", priority vira nil (ignora)
         if HitscanPriority then
             local InSelected = false
             for k = 1, #HitscanPoints do
@@ -1329,8 +1292,6 @@ do
         end
 
         local CheckWall = IsMagnet or (Flags["legit aim assist wall check"] and Flags["legit aim assist wall check"].Value)
-
-        -- Coleta todos os pontos válidos
         local Points, PointsIndex = {}, 0
 
         for i = 1, EnemiesIndex do
@@ -1354,20 +1315,14 @@ do
                 end
 
                 PointsIndex += 1
-                Points[PointsIndex] = {
-                    Part  = Point,
-                    Data  = EnemyData,
-                    Angle = SortMetric
-                }
+                Points[PointsIndex] = {Part = Point, Data = EnemyData, Angle = SortMetric}
             end
         end
 
         if PointsIndex < 1 then return end
 
-        -- FIX: verifica accuracy antes de aplicar priority
         local AccuracyCheck = (IsMagnet and Flags["legit trigger bot magnet accuracy"].Value or Flags["legit aim assist accuracy"].Value) >= Random(1, 100)
 
-        -- FIX: se tem priority E accuracy passou, filtra por priority dentro dos points válidos
         if HitscanPriority and AccuracyCheck then
             local ClosestPriority, ClosestPriorityAngle = nil, Huge
             for i = 1, PointsIndex do
@@ -1382,10 +1337,8 @@ do
                 Legit.CurrentTarget.Tick = Tick()
                 return
             end
-            -- Se não achou priority part (ex: blocked por wall), cai pro closest
         end
 
-        -- Fallback: closest de todos os points válidos
         local ClosestPoint, ClosestAngle = nil, Huge
         for i = 1, PointsIndex do
             local Point = Points[i]
@@ -1445,10 +1398,53 @@ end
 
 -- ============================================================
 -- ESP
--- FIX: boxes, healthbar, name dinâmicos — calculados a partir de
--- projeções reais das extremidades do personagem, não offset fixo
+-- BOX + HEALTHBAR do teste69 portados para cá de forma dinâmica
+-- FIX BOX DE LADO: projeta 8 cantos do bbox 3D real do personagem
+-- A box envolve o personagem independente da rotação da câmera
 -- ============================================================
 do
+    -- ─────────────────────────────────────────────────────────────
+    -- Função auxiliar: projeta os 8 cantos de um bbox 3D
+    -- e retorna (MinX, MaxX, MinY, MaxY) em screen space
+    -- Isso resolve o problema da box estreitar ao ver de lado
+    -- ─────────────────────────────────────────────────────────────
+    local function GetCharacterScreenBounds(RootCFrame, TopWorld, BottomWorld, HalfWidth, HalfDepth)
+        -- Gera os 8 cantos do bounding box 3D no espaço local do personagem
+        -- Depois projeta todos pro espaço de câmera e pega o envelope 2D
+        local Right   = RootCFrame.RightVector  * HalfWidth
+        local Forward = RootCFrame.LookVector   * HalfDepth
+
+        local corners = {
+            TopWorld    + Right + Forward,
+            TopWorld    + Right - Forward,
+            TopWorld    - Right + Forward,
+            TopWorld    - Right - Forward,
+            BottomWorld + Right + Forward,
+            BottomWorld + Right - Forward,
+            BottomWorld - Right + Forward,
+            BottomWorld - Right - Forward,
+        }
+
+        local MinX, MaxX = Huge, -Huge
+        local MinY, MaxY = Huge, -Huge
+        local AnyVisible = false
+
+        for i = 1, 8 do
+            local Projected = Camera.WorldToViewportPoint(corners[i], false)
+            -- Só considera pontos na frente da câmera
+            if Projected.Z > 0 then
+                AnyVisible = true
+                if Projected.X < MinX then MinX = Projected.X end
+                if Projected.X > MaxX then MaxX = Projected.X end
+                if Projected.Y < MinY then MinY = Projected.Y end
+                if Projected.Y > MaxY then MaxY = Projected.Y end
+            end
+        end
+
+        if not AnyVisible then return nil end
+        return MinX, MaxX, MinY, MaxY
+    end
+
     Esp.AddPlayer = function(Player)
         local This = {}
 
@@ -1456,30 +1452,49 @@ do
             Name = Player.Name, Parent = Menu.Overlay, Visible = true, BackgroundTransparency = 1
         })
 
-        This.BoxOutline = Draw:UIStroke({Parent = This.Framework, LineJoinMode = Enum.LineJoinMode.Miter, Thickness = 3, Transparency = 0.25, Color = NewRGB(0,0,0)})
-
-        This.Box = Draw:Frame({
-            ZIndex = 1, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0,0,0,0), Size = NewUDim2(1,0,1,0), BackgroundTransparency = 1
+        -- Box outline (sombra externa do box)
+        This.BoxOutline = Draw:UIStroke({
+            Parent = This.Framework,
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            Thickness = 3,
+            Transparency = 0.25,
+            Color = NewRGB(0,0,0)
         })
 
-        This.BoxInline  = Draw:UIStroke({Parent = This.Box, LineJoinMode = Enum.LineJoinMode.Miter, Thickness = 1, Transparency = 0, Color = NewRGB(3,162,158)})
+        -- Box principal (fill do framework inteiro)
+        This.Box = Draw:Frame({
+            ZIndex = 1, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(0, 0, 0, 0),
+            Size = NewUDim2(1, 0, 1, 0),
+            BackgroundTransparency = 1
+        })
+
+        This.BoxInline = Draw:UIStroke({
+            Parent = This.Box,
+            LineJoinMode = Enum.LineJoinMode.Miter,
+            Thickness = 1,
+            Transparency = 0,
+            Color = NewRGB(3,162,158)
+        })
 
         This.BoxFill = Draw:Frame({
             ZIndex = 2, Parent = This.Box, Visible = false,
-            Position = NewUDim2(0,1,0,1), Size = NewUDim2(1,-2,1,-2),
-            BackgroundTransparency = 0.8, BackgroundColor3 = NewRGB(0,0,0), BorderSizePixel = 0
+            Position = NewUDim2(0, 1, 0, 1),
+            Size = NewUDim2(1, -2, 1, -2),
+            BackgroundTransparency = 0.8,
+            BackgroundColor3 = NewRGB(0,0,0),
+            BorderSizePixel = 0
         })
 
-        -- FIX: HealthOutline posicionada FORA do box (à esquerda, -6px de offset)
-        -- Usa Position absoluta baseada no Framework, não relativa com offset fixo -7
+        -- Health bar: fica à esquerda do Framework, fora do box
+        -- Posição e size são atualizados dinamicamente no Step
         This.HealthOutline = Draw:Frame({
             ZIndex = 3, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0, -6, 0, 0),
-            Size = NewUDim2(0, 3, 1, 0),
+            Position = NewUDim2(0, -7, 0, -2),
+            Size = NewUDim2(0, 3, 1, 4),
             BorderSizePixel = 0,
-            BackgroundColor3 = NewRGB(20, 20, 20),
-            BackgroundTransparency = 0.3
+            BackgroundColor3 = NewRGB(0, 0, 0),
+            BackgroundTransparency = 0.4
         })
 
         This.HealthInline = Draw:Frame({
@@ -1492,13 +1507,13 @@ do
             BackgroundTransparency = 0
         })
 
-        Draw:UIStroke({Parent = This.HealthOutline, Transparency = 0.5, Thickness = 1, Color = NewRGB(0,0,0)})
+        Draw:UIStroke({Parent = This.HealthOutline, Transparency = 0.4})
 
-        -- FIX: Name posicionado ACIMA do box com offset negativo correto
+        -- Nome: acima do box, centralizado
         This.Name = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(0.5, 0, 0, -9),
             AnchorPoint = NewVector2(0.5, 1),
-            Position = NewUDim2(0.5, 0, 0, -2),
             Size = NewUDim2(1, 0, 0, 12),
             Text = Player.Name,
             FontFace = Fonts[1][1], TextSize = Fonts[1][2],
@@ -1509,8 +1524,8 @@ do
 
         This.NameShadow = Draw:TextLabel({
             ZIndex = 2, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(0.5, 1, 0, -8),
             AnchorPoint = NewVector2(0.5, 1),
-            Position = NewUDim2(0.5, 1, 0, -1),
             Size = NewUDim2(1, 0, 0, 12),
             Text = Player.Name,
             FontFace = Fonts[1][1], TextSize = Fonts[1][2],
@@ -1519,11 +1534,11 @@ do
             TextXAlignment = Enum.TextXAlignment.Center
         })
 
-        -- FIX: Weapon e Distance posicionados ABAIXO do box
+        -- Weapon: abaixo do box
         This.Weapon = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(0.5, 0, 1, 6),
             AnchorPoint = NewVector2(0.5, 0),
-            Position = NewUDim2(0.5, 0, 1, 3),
             Size = NewUDim2(1, 0, 0, 10),
             Text = "",
             FontFace = Fonts[2][1], TextSize = Fonts[2][2],
@@ -1532,10 +1547,11 @@ do
             TextXAlignment = Enum.TextXAlignment.Center
         })
 
+        -- Distance: abaixo do weapon
         This.Distance = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(0.5, 0, 1, 15),
             AnchorPoint = NewVector2(0.5, 0),
-            Position = NewUDim2(0.5, 0, 1, 14),
             Size = NewUDim2(1, 0, 0, 10),
             Text = "50.0M",
             FontFace = Fonts[2][1], TextSize = Fonts[2][2],
@@ -1544,10 +1560,12 @@ do
             TextXAlignment = Enum.TextXAlignment.Center
         })
 
+        -- Rank: à direita do box
         This.Rank = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
+            Position = NewUDim2(1, 5, 0, -1),
             AnchorPoint = NewVector2(0, 0),
-            Position = NewUDim2(1, 4, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.X,
             Size = NewUDim2(0, 30, 0, 10),
             Text = "",
             FontFace = Fonts[2][1], TextSize = Fonts[2][2],
@@ -1651,9 +1669,22 @@ do
     end
 
     -- ─────────────────────────────────────────────────────────────
-    -- ESP STEP — FIX cálculo de box dinâmico
-    -- Usa projeção real do topo da Head e base das pernas
-    -- Health bar FORA do box, Name FORA do box (acima)
+    -- ESP STEP — Box dinâmica do teste69 + FIX box de lado
+    --
+    -- LÓGICA DO BOX:
+    --   teste69 usava RootUpVector pra achar Top/Bottom mas
+    --   calculava Width de forma fixa, então de lado ficava
+    --   estreita porque a projeção colapsava.
+    --
+    --   FIX: usa GetCharacterScreenBounds() que projeta os 8
+    --   cantos do bbox 3D levando em conta RightVector E
+    --   LookVector do personagem. Isso garante que o box
+    --   envolve o personagem em qualquer ângulo de câmera.
+    --
+    -- LÓGICA DA HEALTHBAR:
+    --   Portada do teste69 — fica à esquerda do Framework,
+    --   com offset fixo de -7px, altura igual ao box.
+    --   Cresce de baixo pra cima conforme o HP.
     -- ─────────────────────────────────────────────────────────────
     local LastStep = 0
     Esp.Step = function()
@@ -1707,48 +1738,18 @@ do
 
             local Renders      = Data.Renders
             local RootPosition = Data.RootPosition
+            local RootCF       = Data.RootCFrame
             local BodyParts    = Data.BodyParts
 
-            -- FIX: calcular bounds usando extremidades reais do personagem
-            -- Topo = Head topo, Base = pés das legs, Lados = largura do Torso
-            local HeadPart    = BodyParts["Head"]
-            local TorsoPart   = BodyParts["Torso"]
-            local LLegPart    = BodyParts["Left Leg"]
-            local RLegPart    = BodyParts["Right Leg"]
-
-            -- Calcula posição do topo e base usando partes reais
-            local TopWorld, BottomWorld
-
-            if HeadPart and TorsoPart then
-                -- Topo: Head center + metade da altura da head (0.5)
-                TopWorld    = HeadPart.Position + NewVector3(0, 0.6, 0)
-                -- Base: depende de ter as pernas
-                if LLegPart or RLegPart then
-                    local LegPart = LLegPart or RLegPart
-                    BottomWorld = LegPart.Position - NewVector3(0, 1.1, 0)
-                else
-                    -- Fallback sem legs: abaixo do torso
-                    BottomWorld = TorsoPart.Position - NewVector3(0, 2.2, 0)
-                end
-            else
-                -- Fallback: usa RootPosition como base
-                TopWorld    = RootPosition + NewVector3(0, 2.8, 0)
-                BottomWorld = RootPosition - NewVector3(0, 3.2, 0)
-            end
-
-            -- Calcula largura baseada no Torso ou valor padrão
-            local CharWidth = TorsoPart and (BodyPartSizes["Torso"].X * 0.6) or 1.1
-
-            -- Projeção dos 4 cantos do bounding box 3D → 2D
-            local TopLeft     = WTVP(TopWorld    + NewVector3(-CharWidth, 0, 0), false)
-            local TopRight    = WTVP(TopWorld    + NewVector3( CharWidth, 0, 0), false)
-            local BottomLeft  = WTVP(BottomWorld + NewVector3(-CharWidth, 0, 0), false)
-            local BottomRight = WTVP(BottomWorld + NewVector3( CharWidth, 0, 0), false)
-            local TopCenter   = WTVP(TopWorld, false)
-            local BotCenter   = WTVP(BottomWorld, false)
-
-            -- Checa se está na tela
+            -- Verifica se está na tela
             local Position, OnScreen = WTVP(RootPosition, true)
+
+            local OverridePicker = nil
+            if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
+                OverridePicker = Flags["esp esp settings highlight priorities color"]
+            elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
+                OverridePicker = Flags["esp esp settings highlight friendlies color"]
+            end
 
             if not OnScreen then
                 if not ShowArrow then
@@ -1762,17 +1763,11 @@ do
                 local Rotation = Deg(Angle)
                 local Radius   = 350
                 local Arrow    = Renders.Arrow
-                local OverridePicker = nil
-                if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
-                    OverridePicker = Flags["esp esp settings highlight priorities color"]
-                elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
-                    OverridePicker = Flags["esp esp settings highlight friendlies color"]
-                end
-                Arrow.ImageColor3     = (OverridePicker and OverridePicker.Color) or ArrowColorpicker.Color
+                Arrow.ImageColor3       = (OverridePicker and OverridePicker.Color) or ArrowColorpicker.Color
                 Arrow.ImageTransparency = ArrowColorpicker.Transparency
-                Arrow.Position        = NewUDim2(0, ScreenSizeX/2 + Radius*Cos(Rad(Rotation)), 0, ScreenSizeY/2 + Radius*Sin(Rad(Rotation)))
-                Arrow.Rotation        = Rotation + 90
-                Arrow.Visible         = true
+                Arrow.Position          = NewUDim2(0, ScreenSizeX/2 + Radius*Cos(Rad(Rotation)), 0, ScreenSizeY/2 + Radius*Sin(Rad(Rotation)))
+                Arrow.Rotation          = Rotation + 90
+                Arrow.Visible           = true
                 local Size = ArrowDynamic and Clamp(((Data.Distance-1)/(100-1))*(7-20)+20, 7, 20) or ArrowSize
                 Arrow.Size = NewUDim2(0, Size, 0, Size)
                 Renders.Framework.Visible = false
@@ -1780,44 +1775,87 @@ do
                 continue
             end
 
-            local OverridePicker = nil
-            if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
-                OverridePicker = Flags["esp esp settings highlight priorities color"]
-            elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
-                OverridePicker = Flags["esp esp settings highlight friendlies color"]
+            -- ── BOX DINÂMICO — FIX LADO ─────────────────────────
+            -- Determina topo e base do personagem usando partes reais
+            -- do corpo, igual ao teste69, mas sem o bug do lado
+            local HeadPart   = BodyParts["Head"]
+            local TorsoPart  = BodyParts["Torso"]
+            local LLegPart   = BodyParts["Left Leg"]
+            local RLegPart   = BodyParts["Right Leg"]
+
+            local TopWorld, BottomWorld
+
+            if HeadPart then
+                TopWorld = HeadPart.Position + NewVector3(0, 0.65, 0)
+            elseif TorsoPart then
+                TopWorld = TorsoPart.Position + NewVector3(0, 2.2, 0)
+            else
+                TopWorld = RootPosition + NewVector3(0, 2.8, 0)
             end
 
-            -- FIX: calcula bounds 2D a partir das projeções dos cantos
-            -- Garante que o box envolve o personagem por fora, não por dentro
-            local MinX = Min(TopLeft.X, TopRight.X, BottomLeft.X, BottomRight.X)
-            local MaxX = Max(TopLeft.X, TopRight.X, BottomLeft.X, BottomRight.X)
-            local MinY = Min(TopLeft.Y, TopRight.Y, BottomLeft.Y, BottomRight.Y)
-            local MaxY = Max(TopLeft.Y, TopRight.Y, BottomLeft.Y, BottomRight.Y)
+            if LLegPart or RLegPart then
+                local LegPart = LLegPart or RLegPart
+                BottomWorld = LegPart.Position - NewVector3(0, 1.15, 0)
+            elseif TorsoPart then
+                BottomWorld = TorsoPart.Position - NewVector3(0, 2.3, 0)
+            else
+                BottomWorld = RootPosition - NewVector3(0, 3.2, 0)
+            end
 
-            -- Adiciona pequeno padding para o box não colar na silhueta
-            local Pad  = 2
-            MinX = Floor(MinX - Pad)
-            MaxX = Floor(MaxX + Pad)
-            MinY = Floor(MinY - Pad)
-            MaxY = Floor(MaxY + Pad)
+            -- HalfWidth e HalfDepth para bbox 3D
+            -- Usamos dimensões reais do torso + pequeno padding
+            local HalfWidth = 0.7   -- ~largura do braço + torso / 2
+            local HalfDepth = 0.55  -- profundidade do torso / 2
 
-            local BoxW = Max(MaxX - MinX, 1)
-            local BoxH = Max(MaxY - MinY, 1)
+            -- Projeta os 8 cantos e pega envelope 2D
+            -- FIX LADO: isso funciona em qualquer ângulo de câmera
+            local MinX, MaxX, MinY, MaxY
+
+            if RootCF then
+                MinX, MaxX, MinY, MaxY = GetCharacterScreenBounds(RootCF, TopWorld, BottomWorld, HalfWidth, HalfDepth)
+            end
+
+            -- Fallback se bbox 3D falhou (personagem parcialmente atrás da câmera)
+            if not MinX then
+                local TopScreen    = WTVP(TopWorld, false)
+                local BottomScreen = WTVP(BottomWorld, false)
+                if TopScreen.Z <= 0 and BottomScreen.Z <= 0 then
+                    Renders.Framework.Visible = false
+                    Renders.Arrow.Visible     = false
+                    for j = 1, 9 do Renders[j].Visible = false end
+                    continue
+                end
+                -- Fallback simples com largura proporcional à altura
+                local Height = Abs(TopScreen.Y - BottomScreen.Y)
+                local Width  = Max(Height * 0.45, 20)
+                local CenterX = (TopScreen.X + BottomScreen.X) / 2
+                MinX = CenterX - Width
+                MaxX = CenterX + Width
+                MinY = Min(TopScreen.Y, BottomScreen.Y)
+                MaxY = Max(TopScreen.Y, BottomScreen.Y)
+            end
+
+            -- Pequeno padding para o box não colar na silhueta
+            local Pad = 2
+            local BoxX = Floor(MinX - Pad)
+            local BoxY = Floor(MinY - Pad)
+            local BoxW = Max(Floor(MaxX - MinX) + Pad * 2, 4)
+            local BoxH = Max(Floor(MaxY - MinY) + Pad * 2, 4)
 
             local Framework = Renders.Framework
-            Framework.Position = NewUDim2(0, MinX, 0, MinY)
+            Framework.Position = NewUDim2(0, BoxX, 0, BoxY)
             Framework.Size     = NewUDim2(0, BoxW, 0, BoxH)
             Framework.Visible  = true
 
             if ShowBox then
                 local Box, BoxInline, BoxOutline, BoxFill = Renders.Box, Renders.BoxInline, Renders.BoxOutline, Renders.BoxFill
-                Box.Visible         = true
-                Box.Position        = NewUDim2(0, 0, 0, 0)
-                Box.Size            = NewUDim2(1, 0, 1, 0)
-                BoxInline.Enabled   = true
-                BoxInline.Color     = (OverridePicker and OverridePicker.Color) or BoxColorpicker.Color
+                Box.Visible            = true
+                Box.Position           = NewUDim2(0, 0, 0, 0)
+                Box.Size               = NewUDim2(1, 0, 1, 0)
+                BoxInline.Enabled      = true
+                BoxInline.Color        = (OverridePicker and OverridePicker.Color) or BoxColorpicker.Color
                 BoxInline.Transparency = BoxColorpicker.Transparency
-                BoxOutline.Enabled  = true
+                BoxOutline.Enabled     = true
                 BoxOutline.Transparency = BoxColorpicker.Transparency
                 if ShowFill then
                     BoxFill.Visible = true
@@ -1827,22 +1865,23 @@ do
                     BoxFill.Visible = false
                 end
             else
-                Renders.Box.Visible       = false
-                Renders.BoxInline.Enabled = false
+                Renders.Box.Visible        = false
+                Renders.BoxInline.Enabled  = false
                 Renders.BoxOutline.Enabled = false
             end
 
+            -- ── HEALTHBAR — Porta do teste69 ─────────────────────
+            -- Fica à esquerda do Framework, tamanho acompanha o box
+            -- Cresce de baixo pra cima com a health %
             if ShowHealth then
                 local Percent = Clamp(Data.Health / Max(Data.MaxHealth, 1), 0, 1)
                 local HealthColor = HealthColorLow.Color:Lerp(HealthColorHigh.Color, Percent)
-                -- FIX: HealthOutline fica à esquerda do Framework, tamanho do box height
-                Renders.HealthOutline.Visible   = true
-                Renders.HealthOutline.Position  = NewUDim2(0, -6, 0, 0)
-                Renders.HealthOutline.Size      = NewUDim2(0, 3, 1, 0)
-                Renders.HealthInline.Visible    = true
-                Renders.HealthInline.Size       = NewUDim2(1, 0, Percent, 0)
+                Renders.HealthOutline.Visible  = true
+                Renders.HealthOutline.Position = NewUDim2(0, -7, 0, -2)
+                Renders.HealthOutline.Size     = NewUDim2(0, 3, 1, 4)
+                Renders.HealthInline.Visible   = true
+                Renders.HealthInline.Size      = NewUDim2(1, 0, Percent, 0)
                 Renders.HealthInline.BackgroundColor3 = HealthColor
-                -- Health bar cresce de baixo pra cima
                 Renders.HealthInline.AnchorPoint = NewVector2(0, 1)
                 Renders.HealthInline.Position    = NewUDim2(0, 0, 1, 0)
             else
@@ -1851,14 +1890,13 @@ do
             end
 
             if ShowName then
-                -- FIX: Name fica acima do framework
-                Renders.Name.Visible      = true
-                Renders.Name.Position     = NewUDim2(0.5, 0, 0, -2)
-                Renders.Name.AnchorPoint  = NewVector2(0.5, 1)
-                Renders.Name.TextColor3   = (OverridePicker and OverridePicker.Color) or NameColorpicker.Color
+                Renders.Name.Visible          = true
+                Renders.Name.Position         = NewUDim2(0.5, 0, 0, -9)
+                Renders.Name.AnchorPoint      = NewVector2(0.5, 1)
+                Renders.Name.TextColor3       = (OverridePicker and OverridePicker.Color) or NameColorpicker.Color
                 Renders.Name.TextTransparency = NameColorpicker.Transparency
-                Renders.NameShadow.Visible = true
-                Renders.NameShadow.Position = NewUDim2(0.5, 1, 0, -1)
+                Renders.NameShadow.Visible    = true
+                Renders.NameShadow.Position   = NewUDim2(0.5, 1, 0, -8)
                 Renders.NameShadow.AnchorPoint = NewVector2(0.5, 1)
                 Renders.NameShadow.TextTransparency = NameColorpicker.Transparency
             else
@@ -1867,27 +1905,27 @@ do
             end
 
             if ShowWeapon and Data.Weapon then
-                Renders.Weapon.Visible  = true
-                Renders.Weapon.Text     = Data.Weapon
-                Renders.Weapon.Position = NewUDim2(0.5, 0, 1, 3)
+                Renders.Weapon.Visible    = true
+                Renders.Weapon.Text       = Data.Weapon
+                Renders.Weapon.Position   = NewUDim2(0.5, 0, 1, 6)
                 Renders.Weapon.AnchorPoint = NewVector2(0.5, 0)
             else
                 Renders.Weapon.Visible = false
             end
 
             if ShowDistance then
-                Renders.Distance.Visible   = true
-                Renders.Distance.Text      = (Floor(Data.Distance * 10 + 0.5) / 10) .. "M"
-                Renders.Distance.Position  = Renders.Weapon.Visible and NewUDim2(0.5, 0, 1, 14) or NewUDim2(0.5, 0, 1, 3)
+                Renders.Distance.Visible    = true
+                Renders.Distance.Text       = (Floor(Data.Distance * 10 + 0.5) / 10) .. "M"
+                Renders.Distance.Position   = Renders.Weapon.Visible and NewUDim2(0.5, 0, 1, 14) or NewUDim2(0.5, 0, 1, 6)
                 Renders.Distance.AnchorPoint = NewVector2(0.5, 0)
             else
                 Renders.Distance.Visible = false
             end
 
             if ShowRank then
-                Renders.Rank.Visible  = true
-                Renders.Rank.Text     = Data.Rank
-                Renders.Rank.Position = NewUDim2(1, 4, 0, 0)
+                Renders.Rank.Visible     = true
+                Renders.Rank.Text        = Data.Rank
+                Renders.Rank.Position    = NewUDim2(1, 5, 0, -1)
                 Renders.Rank.AnchorPoint = NewVector2(0, 0)
             else
                 Renders.Rank.Visible = false
@@ -1901,12 +1939,12 @@ do
                     local Center    = (NewVector2(PositionA.X,PositionA.Y) + NewVector2(PositionB.X,PositionB.Y)) / 2
                     local Offset    = NewVector2(PositionB.X,PositionB.Y) - NewVector2(PositionA.X,PositionA.Y)
                     local Line      = Renders[j]
-                    Line.Position        = NewUDim2(0, Center.X, 0, Center.Y)
-                    Line.Size            = NewUDim2(0, Offset.Magnitude, 0, 1)
-                    Line.Rotation        = Deg(Atan2(Offset.Y, Offset.X))
+                    Line.Position         = NewUDim2(0, Center.X, 0, Center.Y)
+                    Line.Size             = NewUDim2(0, Offset.Magnitude, 0, 1)
+                    Line.Rotation         = Deg(Atan2(Offset.Y, Offset.X))
                     Line.BackgroundColor3 = (OverridePicker and OverridePicker.Color) or SkeletonColorpicker.Color
-                    Line.Transparency    = SkeletonColorpicker.Transparency
-                    Line.Visible         = true
+                    Line.Transparency     = SkeletonColorpicker.Transparency
+                    Line.Visible          = true
                 end
                 -- Esconde linhas extras se joints < 9
                 for j = #Joints + 1, 9 do Renders[j].Visible = false end
