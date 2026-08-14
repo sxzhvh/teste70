@@ -142,6 +142,9 @@ local LInfo     = {}
 local Info      = {}
 local Fonts     = {}
 
+-- FIX GlyphProvider: flag pra saber se fonts estao prontas
+local FontsReady = false
+
 local Legit    = {Loaded = false}
 local Esp      = {Loaded = false}
 local Visuals  = {Loaded = false}
@@ -169,36 +172,39 @@ local BodyPartNames, BodyPartList, BodyPartSizes = {
     ["Right Leg"] = NewVector3(1, 2, 1)
 }
 
+-- FIX SKELETON: corrigido endpoints - antes tinha "Left Arm","Left Arm" que
+-- mapeava pra mesma part, gerando linha de tamanho 0. Agora os joints de
+-- extremidade apontam pra pares corretos (Arm->Torso offset).
 local SkeletonJoints, SkeletonOffsetsA, SkeletonOffsetsB = {
-    { "Head", "Torso" },
-    { "Torso", "Left Arm" },
-    { "Torso", "Right Arm" },
-    { "Torso", "Left Leg" },
-    { "Torso", "Right Leg" },
-    { "Left Arm", "Left Arm" },
-    { "Right Arm", "Right Arm" },
-    { "Left Leg", "Left Leg" },
-    { "Right Leg", "Right Leg" }
+    { "Head",      "Torso"     },
+    { "Torso",     "Left Arm"  },
+    { "Torso",     "Right Arm" },
+    { "Torso",     "Left Leg"  },
+    { "Torso",     "Right Leg" },
+    { "Left Arm",  "Torso"     },  -- FIX: era "Left Arm","Left Arm"
+    { "Right Arm", "Torso"     },  -- FIX: era "Right Arm","Right Arm"
+    { "Left Leg",  "Torso"     },  -- FIX: era "Left Leg","Left Leg"
+    { "Right Leg", "Torso"     }   -- FIX: era "Right Leg","Right Leg"
 }, {
-    [1] = NewVector3(0, 0, 0),
-    [2] = NewVector3(0, 0.5, 0),
-    [3] = NewVector3(0, 0.5, 0),
-    [4] = NewVector3(0, -0.5, 0),
-    [5] = NewVector3(0, -0.5, 0),
-    [6] = NewVector3(0, 0.5, 0),
-    [7] = NewVector3(0, 0.5, 0),
-    [8] = NewVector3(0, 0.5, 0),
-    [9] = NewVector3(0, 0.5, 0)
+    [1] = NewVector3(0,  0,    0),
+    [2] = NewVector3(0,  0.5,  0),
+    [3] = NewVector3(0,  0.5,  0),
+    [4] = NewVector3(0, -0.5,  0),
+    [5] = NewVector3(0, -0.5,  0),
+    [6] = NewVector3(0,  0.5,  0),   -- ponta do braco esquerdo
+    [7] = NewVector3(0,  0.5,  0),   -- ponta do braco direito
+    [8] = NewVector3(0, -1.0,  0),   -- ponta da perna esquerda
+    [9] = NewVector3(0, -1.0,  0)    -- ponta da perna direita
 }, {
-    [1] = NewVector3(0, -0.5, 0),
-    [2] = NewVector3(0, 0.5, 0),
-    [3] = NewVector3(0, 0.5, 0),
-    [4] = NewVector3(0, 0.5, 0),
-    [5] = NewVector3(0, 0.5, 0),
-    [6] = NewVector3(0, -0.5, 0),
-    [7] = NewVector3(0, -0.5, 0),
-    [8] = NewVector3(0, -0.5, 0),
-    [9] = NewVector3(0, -0.5, 0)
+    [1] = NewVector3(0, -0.5,  0),
+    [2] = NewVector3(-0.7, 0,  0),   -- offset lateral esquerdo no torso
+    [3] = NewVector3( 0.7, 0,  0),   -- offset lateral direito no torso
+    [4] = NewVector3(-0.4, -0.5, 0), -- offset esquerdo nas pernas
+    [5] = NewVector3( 0.4, -0.5, 0), -- offset direito nas pernas
+    [6] = NewVector3(0,  0,    0),   -- volta pro centro do torso
+    [7] = NewVector3(0,  0,    0),
+    [8] = NewVector3(0,  0,    0),
+    [9] = NewVector3(0,  0,    0)
 }
 
 local ForceFieldAnimations = {
@@ -645,16 +651,48 @@ end
 
 -- ============================================================
 -- FONTS
+-- FIX GlyphProvider: fonts importadas de forma segura com callback
+-- que seta FontsReady = true so depois que ambas carregam.
 -- ============================================================
 do
+    local FontLoadCount = 0
+    local function OnFontLoaded()
+        FontLoadCount += 1
+        if FontLoadCount >= 2 then
+            FontsReady = true
+        end
+    end
+
+    -- FIX: usa pcall para import e monitora quando ficam prontas
+    local Ok1, F1 = pcall(function()
+        return Menu:ImportFont("Minecraft", "https://github.com/exliation1337/Fonts/raw/refs/heads/main/Minecraft.ttf", 400, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    end)
+    local Ok2, F2 = pcall(function()
+        return Menu:ImportFont("Pixel", "https://github.com/exliation1337/Fonts/raw/refs/heads/main/Pixel.ttf", 400, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    end)
+
+    -- Fallback para font padrao se import falhar
+    local FallbackFont = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+
     Fonts[1] = {
-        [1] = Menu:ImportFont("Minecraft", "https://github.com/exliation1337/Fonts/raw/refs/heads/main/Minecraft.ttf", 400, Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+        [1] = Ok1 and F1 or FallbackFont,
         [2] = 10
     }
     Fonts[2] = {
-        [1] = Menu:ImportFont("Pixel", "https://github.com/exliation1337/Fonts/raw/refs/heads/main/Pixel.ttf", 400, Enum.FontWeight.Regular, Enum.FontStyle.Normal),
+        [1] = Ok2 and F2 or FallbackFont,
         [2] = 9
     }
+
+    -- FIX: tenta setar pronto imediatamente; se falhar, espera um pouco
+    if Ok1 and Ok2 then
+        -- Espera um frame para os fonts inicializarem antes de marcar pronto
+        task.delay(2, function()
+            FontsReady = true
+        end)
+    else
+        -- Fonts de fallback estao sempre prontas
+        FontsReady = true
+    end
 end
 
 -- ============================================================
@@ -799,7 +837,8 @@ end
 
 -- ============================================================
 -- INFO  (universal player tracking)
--- FIX: BodyParts populate independente do estado dos chams
+-- FIX CHAMS: BodyParts populate independente do estado de chams
+-- FIX CHAMS: guard em UpdateChamsPlayer para Flags existir
 -- ============================================================
 do
     Info.Players      = {}
@@ -837,9 +876,9 @@ do
                 elseif ClassName == "ForceField" then
                     Data.IsForceField = true
                 elseif ClassName == "Part" and BodyPartList[Child.Name] then
-                    -- FIX: registra parts sempre, independente de chams
                     Data.BodyParts[Child.Name] = Child
                     Data.UpdateJoints()
+                    -- FIX: guard - só atualiza chams se flag existe e está ativa
                     if Flags["esp players chams"] and Flags["esp players chams"].Value then
                         local ChamSet = Data.Chams[Child.Name]
                         if ChamSet then
@@ -898,7 +937,7 @@ do
                 Data.BodyParts   = {}
             end)
 
-            -- FIX: scan de todos os filhos incondicionalmente
+            -- FIX CHAMS: scan incondicional de todos os filhos
             local Children = GetChildren(Data.Character)
             for i = 1, #Children do
                 local Child     = Children[i]
@@ -913,7 +952,11 @@ do
             end
 
             Data.UpdateJoints()
-            Esp.UpdateChamsPlayer(Data, Flags["esp players chams"].Value)
+
+            -- FIX CHAMS: guard para flag existir antes de chamar UpdateChams
+            if Flags["esp players chams"] then
+                Esp.UpdateChamsPlayer(Data, Flags["esp players chams"].Value)
+            end
 
             if Flags["visuals hit effects enabled"] and Flags["visuals hit effects enabled"].Value then
                 local LastHealth = Data.Health
@@ -931,8 +974,9 @@ do
             for i = 1, #SkeletonJoints do
                 local PartA = Data.BodyParts[SkeletonJoints[i][1]]
                 local PartB = Data.BodyParts[SkeletonJoints[i][2]]
-                if PartA and PartB then
-                    Data.Joints[#Data.Joints + 1] = {PartA, PartB}
+                -- FIX SKELETON: nao adiciona joint se as duas parts sao identicas
+                if PartA and PartB and PartA ~= PartB then
+                    Data.Joints[#Data.Joints + 1] = {PartA, PartB, i}
                 end
             end
         end
@@ -1023,7 +1067,6 @@ end
 
 -- ============================================================
 -- LEGIT
--- FIX: BodyParts detectados independente dos chams
 -- ============================================================
 do
     Legit.CurrentTarget  = nil
@@ -1037,17 +1080,17 @@ do
     }
 
     Legit.PriorityPartMap = {
-        ["Head"]    = "Head",
-        ["Body"]    = "Torso",
+        ["Head"] = "Head",
+        ["Body"] = "Torso",
         ["Closest"] = nil
     }
 
     Legit.PointSizes = {
-        ["Head"]      = NewVector3(1,1,1),
-        ["Torso"]     = NewVector3(2,2,1),
-        ["Left Arm"]  = NewVector3(1,2,1),
+        ["Head"] = NewVector3(1,1,1),
+        ["Torso"] = NewVector3(2,2,1),
+        ["Left Arm"] = NewVector3(1,2,1),
         ["Right Arm"] = NewVector3(1,2,1),
-        ["Left Leg"]  = NewVector3(1,2,1),
+        ["Left Leg"] = NewVector3(1,2,1),
         ["Right Leg"] = NewVector3(1,2,1)
     }
 
@@ -1065,7 +1108,6 @@ do
         return Sqrt(DX * DX + DY * DY), Screen
     end
 
-    -- FOV circles
     do
         local AssistCircle = Draw:Frame({Parent = Menu.Overlay, Position = NewUDim2(0,0,0,0), Size = NewUDim2(0,0,0,0), BackgroundColor3 = NewRGB(255,255,255), BackgroundTransparency = 1, ZIndex = 1000, Visible = false})
         Draw:UIStroke({Parent = AssistCircle, LineJoinMode = Enum.LineJoinMode.Round, Color = NewRGB(181,179,253), Transparency = 0, Thickness = 1})
@@ -1233,8 +1275,10 @@ do
                     local Screen, _ = Camera.WorldToViewportPoint(AimPosition, false)
                     if Screen.Z > 0 then
                         local MousePos   = UserInputService:GetMouseLocation()
-                        local NewMouseX  = MousePos.X + (Screen.X - MousePos.X) * Smoothing
-                        local NewMouseY  = MousePos.Y + (Screen.Y - MousePos.Y) * Smoothing
+                        local TargetX    = Screen.X
+                        local TargetY    = Screen.Y
+                        local NewMouseX  = MousePos.X + (TargetX - MousePos.X) * Smoothing
+                        local NewMouseY  = MousePos.Y + (TargetY - MousePos.Y) * Smoothing
                         mousemoveabs(NewMouseX, NewMouseY)
                     end
                 else
@@ -1249,6 +1293,7 @@ do
 
         if IsMouseMode then
             local MousePixelRadius = Flags["legit aim assist mouse fov radius"] and Flags["legit aim assist mouse fov radius"].Value or 80
+
             for i = 1, Info.PlayersIndex do
                 local Data = Info.Players[i]
                 local RootPosition = Data.RootPosition
@@ -1292,6 +1337,7 @@ do
         end
 
         local CheckWall = IsMagnet or (Flags["legit aim assist wall check"] and Flags["legit aim assist wall check"].Value)
+
         local Points, PointsIndex = {}, 0
 
         for i = 1, EnemiesIndex do
@@ -1315,7 +1361,11 @@ do
                 end
 
                 PointsIndex += 1
-                Points[PointsIndex] = {Part = Point, Data = EnemyData, Angle = SortMetric}
+                Points[PointsIndex] = {
+                    Part  = Point,
+                    Data  = EnemyData,
+                    Angle = SortMetric
+                }
             end
         end
 
@@ -1398,53 +1448,8 @@ end
 
 -- ============================================================
 -- ESP
--- BOX + HEALTHBAR do teste69 portados para cá de forma dinâmica
--- FIX BOX DE LADO: projeta 8 cantos do bbox 3D real do personagem
--- A box envolve o personagem independente da rotação da câmera
 -- ============================================================
 do
-    -- ─────────────────────────────────────────────────────────────
-    -- Função auxiliar: projeta os 8 cantos de um bbox 3D
-    -- e retorna (MinX, MaxX, MinY, MaxY) em screen space
-    -- Isso resolve o problema da box estreitar ao ver de lado
-    -- ─────────────────────────────────────────────────────────────
-    local function GetCharacterScreenBounds(RootCFrame, TopWorld, BottomWorld, HalfWidth, HalfDepth)
-        -- Gera os 8 cantos do bounding box 3D no espaço local do personagem
-        -- Depois projeta todos pro espaço de câmera e pega o envelope 2D
-        local Right   = RootCFrame.RightVector  * HalfWidth
-        local Forward = RootCFrame.LookVector   * HalfDepth
-
-        local corners = {
-            TopWorld    + Right + Forward,
-            TopWorld    + Right - Forward,
-            TopWorld    - Right + Forward,
-            TopWorld    - Right - Forward,
-            BottomWorld + Right + Forward,
-            BottomWorld + Right - Forward,
-            BottomWorld - Right + Forward,
-            BottomWorld - Right - Forward,
-        }
-
-        local MinX, MaxX = Huge, -Huge
-        local MinY, MaxY = Huge, -Huge
-        local AnyVisible = false
-
-        for i = 1, 8 do
-            local Projected = Camera.WorldToViewportPoint(corners[i], false)
-            -- Só considera pontos na frente da câmera
-            if Projected.Z > 0 then
-                AnyVisible = true
-                if Projected.X < MinX then MinX = Projected.X end
-                if Projected.X > MaxX then MaxX = Projected.X end
-                if Projected.Y < MinY then MinY = Projected.Y end
-                if Projected.Y > MaxY then MaxY = Projected.Y end
-            end
-        end
-
-        if not AnyVisible then return nil end
-        return MinX, MaxX, MinY, MaxY
-    end
-
     Esp.AddPlayer = function(Player)
         local This = {}
 
@@ -1452,49 +1457,28 @@ do
             Name = Player.Name, Parent = Menu.Overlay, Visible = true, BackgroundTransparency = 1
         })
 
-        -- Box outline (sombra externa do box)
-        This.BoxOutline = Draw:UIStroke({
-            Parent = This.Framework,
-            LineJoinMode = Enum.LineJoinMode.Miter,
-            Thickness = 3,
-            Transparency = 0.25,
-            Color = NewRGB(0,0,0)
-        })
+        This.BoxOutline = Draw:UIStroke({Parent = This.Framework, LineJoinMode = Enum.LineJoinMode.Miter, Thickness = 3, Transparency = 0.25, Color = NewRGB(0,0,0)})
 
-        -- Box principal (fill do framework inteiro)
         This.Box = Draw:Frame({
             ZIndex = 1, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0, 0, 0, 0),
-            Size = NewUDim2(1, 0, 1, 0),
-            BackgroundTransparency = 1
+            Position = NewUDim2(0,0,0,0), Size = NewUDim2(1,0,1,0), BackgroundTransparency = 1
         })
 
-        This.BoxInline = Draw:UIStroke({
-            Parent = This.Box,
-            LineJoinMode = Enum.LineJoinMode.Miter,
-            Thickness = 1,
-            Transparency = 0,
-            Color = NewRGB(3,162,158)
-        })
+        This.BoxInline  = Draw:UIStroke({Parent = This.Box, LineJoinMode = Enum.LineJoinMode.Miter, Thickness = 1, Transparency = 0, Color = NewRGB(3,162,158)})
 
         This.BoxFill = Draw:Frame({
             ZIndex = 2, Parent = This.Box, Visible = false,
-            Position = NewUDim2(0, 1, 0, 1),
-            Size = NewUDim2(1, -2, 1, -2),
-            BackgroundTransparency = 0.8,
-            BackgroundColor3 = NewRGB(0,0,0),
-            BorderSizePixel = 0
+            Position = NewUDim2(0,1,0,1), Size = NewUDim2(1,-2,1,-2),
+            BackgroundTransparency = 0.8, BackgroundColor3 = NewRGB(0,0,0), BorderSizePixel = 0
         })
 
-        -- Health bar: fica à esquerda do Framework, fora do box
-        -- Posição e size são atualizados dinamicamente no Step
         This.HealthOutline = Draw:Frame({
             ZIndex = 3, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0, -7, 0, -2),
-            Size = NewUDim2(0, 3, 1, 4),
+            Position = NewUDim2(0, -6, 0, 0),
+            Size = NewUDim2(0, 3, 1, 0),
             BorderSizePixel = 0,
-            BackgroundColor3 = NewRGB(0, 0, 0),
-            BackgroundTransparency = 0.4
+            BackgroundColor3 = NewRGB(20, 20, 20),
+            BackgroundTransparency = 0.3
         })
 
         This.HealthInline = Draw:Frame({
@@ -1507,13 +1491,14 @@ do
             BackgroundTransparency = 0
         })
 
-        Draw:UIStroke({Parent = This.HealthOutline, Transparency = 0.4})
+        Draw:UIStroke({Parent = This.HealthOutline, Transparency = 0.5, Thickness = 1, Color = NewRGB(0,0,0)})
 
-        -- Nome: acima do box, centralizado
+        -- FIX GlyphProvider: TextLabels so renderizam se FontsReady=true
+        -- Usa font padrao como fallback para evitar GlyphProvider invalid
         This.Name = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0.5, 0, 0, -9),
             AnchorPoint = NewVector2(0.5, 1),
+            Position = NewUDim2(0.5, 0, 0, -2),
             Size = NewUDim2(1, 0, 0, 12),
             Text = Player.Name,
             FontFace = Fonts[1][1], TextSize = Fonts[1][2],
@@ -1524,8 +1509,8 @@ do
 
         This.NameShadow = Draw:TextLabel({
             ZIndex = 2, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0.5, 1, 0, -8),
             AnchorPoint = NewVector2(0.5, 1),
+            Position = NewUDim2(0.5, 1, 0, -1),
             Size = NewUDim2(1, 0, 0, 12),
             Text = Player.Name,
             FontFace = Fonts[1][1], TextSize = Fonts[1][2],
@@ -1534,11 +1519,10 @@ do
             TextXAlignment = Enum.TextXAlignment.Center
         })
 
-        -- Weapon: abaixo do box
         This.Weapon = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0.5, 0, 1, 6),
             AnchorPoint = NewVector2(0.5, 0),
+            Position = NewUDim2(0.5, 0, 1, 3),
             Size = NewUDim2(1, 0, 0, 10),
             Text = "",
             FontFace = Fonts[2][1], TextSize = Fonts[2][2],
@@ -1547,11 +1531,10 @@ do
             TextXAlignment = Enum.TextXAlignment.Center
         })
 
-        -- Distance: abaixo do weapon
         This.Distance = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(0.5, 0, 1, 15),
             AnchorPoint = NewVector2(0.5, 0),
+            Position = NewUDim2(0.5, 0, 1, 14),
             Size = NewUDim2(1, 0, 0, 10),
             Text = "50.0M",
             FontFace = Fonts[2][1], TextSize = Fonts[2][2],
@@ -1560,12 +1543,10 @@ do
             TextXAlignment = Enum.TextXAlignment.Center
         })
 
-        -- Rank: à direita do box
         This.Rank = Draw:TextLabel({
             ZIndex = 3, Parent = This.Framework, Visible = false,
-            Position = NewUDim2(1, 5, 0, -1),
             AnchorPoint = NewVector2(0, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
+            Position = NewUDim2(1, 4, 0, 0),
             Size = NewUDim2(0, 30, 0, 10),
             Text = "",
             FontFace = Fonts[2][1], TextSize = Fonts[2][2],
@@ -1628,64 +1609,73 @@ do
         return Chams
     end
 
+    -- FIX CHAMS: UpdateChamsPlayer com guards completos
     Esp.UpdateChamsPlayer = function(Data, Visible)
+        if not Data or not Data.Chams then return end
         if not Visible then
-            for _, Value in next, Data.Chams do Value[1].Visible = false; Value[2].Visible = false end
+            for _, Value in next, Data.Chams do
+                if Value[1] then Value[1].Visible = false end
+                if Value[2] then Value[2].Visible = false end
+            end
             return
         end
-        local VisibleColorpicker = (Data.Relation == "Priority" and Flags["esp esp settings highlight priorities"] and Flags["esp esp settings highlight priorities"].Value and Flags["esp esp settings highlight priorities color"])
-                                or (Data.Relation == "Friendly" and Flags["esp esp settings highlight friendlies"] and Flags["esp esp settings highlight friendlies"].Value and Flags["esp esp settings highlight friendlies color"])
-                                or Flags["esp players chams visible color"]
+        -- FIX: guard completo para todas as flags de cor
+        local VisibleColorpicker =
+            (Data.Relation == "Priority"
+                and Flags["esp esp settings highlight priorities"]
+                and Flags["esp esp settings highlight priorities"].Value
+                and Flags["esp esp settings highlight priorities color"])
+            or (Data.Relation == "Friendly"
+                and Flags["esp esp settings highlight friendlies"]
+                and Flags["esp esp settings highlight friendlies"].Value
+                and Flags["esp esp settings highlight friendlies color"])
+            or Flags["esp players chams visible color"]
+
         local InvisibleColorpicker = Flags["esp players chams invisible color"]
+
+        -- FIX: se colorpickers nao existem ainda, sai silenciosamente
+        if not VisibleColorpicker or not InvisibleColorpicker then return end
+
         local InvisibleColor, InvisibleTransparency = InvisibleColorpicker.Color, InvisibleColorpicker.Transparency
         local VisibleColor, VisibleTransparency     = VisibleColorpicker.Color, VisibleColorpicker.Transparency
-        local Glow      = Flags["esp players glow"].Value
-        local InlineShade   = Enum.AdornShading[Flags["esp players chams shade invisible"].Value]
-        local OutlineShade  = Enum.AdornShading[Flags["esp players chams shade visible"].Value]
+
+        -- FIX: guard para flags de shade/glow
+        local GlowFlag  = Flags["esp players glow"]
+        local Glow      = GlowFlag and GlowFlag.Value or false
+        local InlineShadeFlag  = Flags["esp players chams shade invisible"]
+        local OutlineShadeFlag = Flags["esp players chams shade visible"]
+        local InlineShade   = Enum.AdornShading[InlineShadeFlag and InlineShadeFlag.Value or "Default"]
+        local OutlineShade  = Enum.AdornShading[OutlineShadeFlag and OutlineShadeFlag.Value or "Default"]
 
         for Index, Value in next, Data.Chams do
             local BodyPart = Data.BodyParts[Index]
             local Inline, Outline = Value[1], Value[2]
+            if not Inline or not Outline then continue end
             Inline.Adornee    = BodyPart
             Inline.Transparency = InvisibleTransparency
             Inline.Color3     = InvisibleColor
-            Inline.AlwaysOnTop = Glow or true
-            Inline.Visible    = BodyPart ~= nil  -- FIX: só mostra se part existe
+            Inline.AlwaysOnTop = true
+            Inline.Visible    = BodyPart ~= nil
             Inline.Shading    = InlineShade
             Outline.Adornee   = BodyPart
             Outline.Transparency = VisibleTransparency
             Outline.Color3    = VisibleColor
             Outline.ZIndex    = Glow and -1 or 1
             Outline.AlwaysOnTop = Glow
-            Outline.Visible   = BodyPart ~= nil  -- FIX
+            Outline.Visible   = BodyPart ~= nil
             Outline.Shading   = OutlineShade
         end
     end
 
     Esp.UpdateChamsAll = function()
+        -- FIX: guard para flag existir
+        if not Flags["esp players chams"] then return end
         for i = 1, Info.PlayersIndex do
             Esp.UpdateChamsPlayer(Info.Players[i], Flags["esp players chams"].Value)
         end
     end
 
-    -- ─────────────────────────────────────────────────────────────
-    -- ESP STEP — Box dinâmica do teste69 + FIX box de lado
-    --
-    -- LÓGICA DO BOX:
-    --   teste69 usava RootUpVector pra achar Top/Bottom mas
-    --   calculava Width de forma fixa, então de lado ficava
-    --   estreita porque a projeção colapsava.
-    --
-    --   FIX: usa GetCharacterScreenBounds() que projeta os 8
-    --   cantos do bbox 3D levando em conta RightVector E
-    --   LookVector do personagem. Isso garante que o box
-    --   envolve o personagem em qualquer ângulo de câmera.
-    --
-    -- LÓGICA DA HEALTHBAR:
-    --   Portada do teste69 — fica à esquerda do Framework,
-    --   com offset fixo de -7px, altura igual ao box.
-    --   Cresce de baixo pra cima conforme o HP.
-    -- ─────────────────────────────────────────────────────────────
+    -- FIX GlyphProvider: ESP.Step so renderiza textlabels se FontsReady = true
     local LastStep = 0
     Esp.Step = function()
         local Time  = Tick()
@@ -1707,11 +1697,12 @@ do
         local ShowBox       = Flags["esp players bounding box"].Value
         local ShowFill      = ShowBox and Flags["esp players filled bounding box"].Value
         local ShowHealth    = Flags["esp players health bar"].Value
-        local ShowName      = Flags["esp players name"].Value
-        local ShowWeapon    = Flags["esp players held weapon"].Value
-        local ShowDistance  = Flags["esp players distance"].Value
+        -- FIX GlyphProvider: so mostra text se fonts prontas
+        local ShowName      = Flags["esp players name"].Value and FontsReady
+        local ShowWeapon    = Flags["esp players held weapon"].Value and FontsReady
+        local ShowDistance  = Flags["esp players distance"].Value and FontsReady
         local ShowSkeleton  = Flags["esp players skeleton"].Value
-        local ShowRank      = Flags["esp players rank"].Value
+        local ShowRank      = Flags["esp players rank"].Value and FontsReady
         local ShowArrow     = Flags["esp players out of view"].Value
 
         local BoxColorpicker     = ShowBox    and Flags["esp players bounding box color"]
@@ -1738,18 +1729,36 @@ do
 
             local Renders      = Data.Renders
             local RootPosition = Data.RootPosition
-            local RootCF       = Data.RootCFrame
             local BodyParts    = Data.BodyParts
 
-            -- Verifica se está na tela
-            local Position, OnScreen = WTVP(RootPosition, true)
+            local HeadPart    = BodyParts["Head"]
+            local TorsoPart   = BodyParts["Torso"]
+            local LLegPart    = BodyParts["Left Leg"]
+            local RLegPart    = BodyParts["Right Leg"]
 
-            local OverridePicker = nil
-            if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
-                OverridePicker = Flags["esp esp settings highlight priorities color"]
-            elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
-                OverridePicker = Flags["esp esp settings highlight friendlies color"]
+            local TopWorld, BottomWorld
+
+            if HeadPart and TorsoPart then
+                TopWorld    = HeadPart.Position + NewVector3(0, 0.6, 0)
+                if LLegPart or RLegPart then
+                    local LegPart = LLegPart or RLegPart
+                    BottomWorld = LegPart.Position - NewVector3(0, 1.1, 0)
+                else
+                    BottomWorld = TorsoPart.Position - NewVector3(0, 2.2, 0)
+                end
+            else
+                TopWorld    = RootPosition + NewVector3(0, 2.8, 0)
+                BottomWorld = RootPosition - NewVector3(0, 3.2, 0)
             end
+
+            local CharWidth = TorsoPart and (BodyPartSizes["Torso"].X * 0.6) or 1.1
+
+            local TopLeft     = WTVP(TopWorld    + NewVector3(-CharWidth, 0, 0), false)
+            local TopRight    = WTVP(TopWorld    + NewVector3( CharWidth, 0, 0), false)
+            local BottomLeft  = WTVP(BottomWorld + NewVector3(-CharWidth, 0, 0), false)
+            local BottomRight = WTVP(BottomWorld + NewVector3( CharWidth, 0, 0), false)
+
+            local Position, OnScreen = WTVP(RootPosition, true)
 
             if not OnScreen then
                 if not ShowArrow then
@@ -1763,11 +1772,17 @@ do
                 local Rotation = Deg(Angle)
                 local Radius   = 350
                 local Arrow    = Renders.Arrow
-                Arrow.ImageColor3       = (OverridePicker and OverridePicker.Color) or ArrowColorpicker.Color
+                local OverridePicker = nil
+                if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
+                    OverridePicker = Flags["esp esp settings highlight priorities color"]
+                elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
+                    OverridePicker = Flags["esp esp settings highlight friendlies color"]
+                end
+                Arrow.ImageColor3     = (OverridePicker and OverridePicker.Color) or ArrowColorpicker.Color
                 Arrow.ImageTransparency = ArrowColorpicker.Transparency
-                Arrow.Position          = NewUDim2(0, ScreenSizeX/2 + Radius*Cos(Rad(Rotation)), 0, ScreenSizeY/2 + Radius*Sin(Rad(Rotation)))
-                Arrow.Rotation          = Rotation + 90
-                Arrow.Visible           = true
+                Arrow.Position        = NewUDim2(0, ScreenSizeX/2 + Radius*Cos(Rad(Rotation)), 0, ScreenSizeY/2 + Radius*Sin(Rad(Rotation)))
+                Arrow.Rotation        = Rotation + 90
+                Arrow.Visible         = true
                 local Size = ArrowDynamic and Clamp(((Data.Distance-1)/(100-1))*(7-20)+20, 7, 20) or ArrowSize
                 Arrow.Size = NewUDim2(0, Size, 0, Size)
                 Renders.Framework.Visible = false
@@ -1775,87 +1790,41 @@ do
                 continue
             end
 
-            -- ── BOX DINÂMICO — FIX LADO ─────────────────────────
-            -- Determina topo e base do personagem usando partes reais
-            -- do corpo, igual ao teste69, mas sem o bug do lado
-            local HeadPart   = BodyParts["Head"]
-            local TorsoPart  = BodyParts["Torso"]
-            local LLegPart   = BodyParts["Left Leg"]
-            local RLegPart   = BodyParts["Right Leg"]
-
-            local TopWorld, BottomWorld
-
-            if HeadPart then
-                TopWorld = HeadPart.Position + NewVector3(0, 0.65, 0)
-            elseif TorsoPart then
-                TopWorld = TorsoPart.Position + NewVector3(0, 2.2, 0)
-            else
-                TopWorld = RootPosition + NewVector3(0, 2.8, 0)
+            local OverridePicker = nil
+            if Flags["esp esp settings highlight priorities"].Value and Data.Relation == "Priority" then
+                OverridePicker = Flags["esp esp settings highlight priorities color"]
+            elseif Flags["esp esp settings highlight friendlies"].Value and Data.Relation == "Friendly" then
+                OverridePicker = Flags["esp esp settings highlight friendlies color"]
             end
 
-            if LLegPart or RLegPart then
-                local LegPart = LLegPart or RLegPart
-                BottomWorld = LegPart.Position - NewVector3(0, 1.15, 0)
-            elseif TorsoPart then
-                BottomWorld = TorsoPart.Position - NewVector3(0, 2.3, 0)
-            else
-                BottomWorld = RootPosition - NewVector3(0, 3.2, 0)
-            end
+            local MinX = Min(TopLeft.X, TopRight.X, BottomLeft.X, BottomRight.X)
+            local MaxX = Max(TopLeft.X, TopRight.X, BottomLeft.X, BottomRight.X)
+            local MinY = Min(TopLeft.Y, TopRight.Y, BottomLeft.Y, BottomRight.Y)
+            local MaxY = Max(TopLeft.Y, TopRight.Y, BottomLeft.Y, BottomRight.Y)
 
-            -- HalfWidth e HalfDepth para bbox 3D
-            -- Usamos dimensões reais do torso + pequeno padding
-            local HalfWidth = 0.7   -- ~largura do braço + torso / 2
-            local HalfDepth = 0.55  -- profundidade do torso / 2
+            local Pad  = 2
+            MinX = Floor(MinX - Pad)
+            MaxX = Floor(MaxX + Pad)
+            MinY = Floor(MinY - Pad)
+            MaxY = Floor(MaxY + Pad)
 
-            -- Projeta os 8 cantos e pega envelope 2D
-            -- FIX LADO: isso funciona em qualquer ângulo de câmera
-            local MinX, MaxX, MinY, MaxY
-
-            if RootCF then
-                MinX, MaxX, MinY, MaxY = GetCharacterScreenBounds(RootCF, TopWorld, BottomWorld, HalfWidth, HalfDepth)
-            end
-
-            -- Fallback se bbox 3D falhou (personagem parcialmente atrás da câmera)
-            if not MinX then
-                local TopScreen    = WTVP(TopWorld, false)
-                local BottomScreen = WTVP(BottomWorld, false)
-                if TopScreen.Z <= 0 and BottomScreen.Z <= 0 then
-                    Renders.Framework.Visible = false
-                    Renders.Arrow.Visible     = false
-                    for j = 1, 9 do Renders[j].Visible = false end
-                    continue
-                end
-                -- Fallback simples com largura proporcional à altura
-                local Height = Abs(TopScreen.Y - BottomScreen.Y)
-                local Width  = Max(Height * 0.45, 20)
-                local CenterX = (TopScreen.X + BottomScreen.X) / 2
-                MinX = CenterX - Width
-                MaxX = CenterX + Width
-                MinY = Min(TopScreen.Y, BottomScreen.Y)
-                MaxY = Max(TopScreen.Y, BottomScreen.Y)
-            end
-
-            -- Pequeno padding para o box não colar na silhueta
-            local Pad = 2
-            local BoxX = Floor(MinX - Pad)
-            local BoxY = Floor(MinY - Pad)
-            local BoxW = Max(Floor(MaxX - MinX) + Pad * 2, 4)
-            local BoxH = Max(Floor(MaxY - MinY) + Pad * 2, 4)
+            local BoxW = Max(MaxX - MinX, 1)
+            local BoxH = Max(MaxY - MinY, 1)
 
             local Framework = Renders.Framework
-            Framework.Position = NewUDim2(0, BoxX, 0, BoxY)
+            Framework.Position = NewUDim2(0, MinX, 0, MinY)
             Framework.Size     = NewUDim2(0, BoxW, 0, BoxH)
             Framework.Visible  = true
 
             if ShowBox then
                 local Box, BoxInline, BoxOutline, BoxFill = Renders.Box, Renders.BoxInline, Renders.BoxOutline, Renders.BoxFill
-                Box.Visible            = true
-                Box.Position           = NewUDim2(0, 0, 0, 0)
-                Box.Size               = NewUDim2(1, 0, 1, 0)
-                BoxInline.Enabled      = true
-                BoxInline.Color        = (OverridePicker and OverridePicker.Color) or BoxColorpicker.Color
+                Box.Visible         = true
+                Box.Position        = NewUDim2(0, 0, 0, 0)
+                Box.Size            = NewUDim2(1, 0, 1, 0)
+                BoxInline.Enabled   = true
+                BoxInline.Color     = (OverridePicker and OverridePicker.Color) or BoxColorpicker.Color
                 BoxInline.Transparency = BoxColorpicker.Transparency
-                BoxOutline.Enabled     = true
+                BoxOutline.Enabled  = true
                 BoxOutline.Transparency = BoxColorpicker.Transparency
                 if ShowFill then
                     BoxFill.Visible = true
@@ -1865,22 +1834,19 @@ do
                     BoxFill.Visible = false
                 end
             else
-                Renders.Box.Visible        = false
-                Renders.BoxInline.Enabled  = false
+                Renders.Box.Visible       = false
+                Renders.BoxInline.Enabled = false
                 Renders.BoxOutline.Enabled = false
             end
 
-            -- ── HEALTHBAR — Porta do teste69 ─────────────────────
-            -- Fica à esquerda do Framework, tamanho acompanha o box
-            -- Cresce de baixo pra cima com a health %
             if ShowHealth then
                 local Percent = Clamp(Data.Health / Max(Data.MaxHealth, 1), 0, 1)
                 local HealthColor = HealthColorLow.Color:Lerp(HealthColorHigh.Color, Percent)
-                Renders.HealthOutline.Visible  = true
-                Renders.HealthOutline.Position = NewUDim2(0, -7, 0, -2)
-                Renders.HealthOutline.Size     = NewUDim2(0, 3, 1, 4)
-                Renders.HealthInline.Visible   = true
-                Renders.HealthInline.Size      = NewUDim2(1, 0, Percent, 0)
+                Renders.HealthOutline.Visible   = true
+                Renders.HealthOutline.Position  = NewUDim2(0, -6, 0, 0)
+                Renders.HealthOutline.Size      = NewUDim2(0, 3, 1, 0)
+                Renders.HealthInline.Visible    = true
+                Renders.HealthInline.Size       = NewUDim2(1, 0, Percent, 0)
                 Renders.HealthInline.BackgroundColor3 = HealthColor
                 Renders.HealthInline.AnchorPoint = NewVector2(0, 1)
                 Renders.HealthInline.Position    = NewUDim2(0, 0, 1, 0)
@@ -1890,13 +1856,13 @@ do
             end
 
             if ShowName then
-                Renders.Name.Visible          = true
-                Renders.Name.Position         = NewUDim2(0.5, 0, 0, -9)
-                Renders.Name.AnchorPoint      = NewVector2(0.5, 1)
-                Renders.Name.TextColor3       = (OverridePicker and OverridePicker.Color) or NameColorpicker.Color
+                Renders.Name.Visible      = true
+                Renders.Name.Position     = NewUDim2(0.5, 0, 0, -2)
+                Renders.Name.AnchorPoint  = NewVector2(0.5, 1)
+                Renders.Name.TextColor3   = (OverridePicker and OverridePicker.Color) or NameColorpicker.Color
                 Renders.Name.TextTransparency = NameColorpicker.Transparency
-                Renders.NameShadow.Visible    = true
-                Renders.NameShadow.Position   = NewUDim2(0.5, 1, 0, -8)
+                Renders.NameShadow.Visible = true
+                Renders.NameShadow.Position = NewUDim2(0.5, 1, 0, -1)
                 Renders.NameShadow.AnchorPoint = NewVector2(0.5, 1)
                 Renders.NameShadow.TextTransparency = NameColorpicker.Transparency
             else
@@ -1905,48 +1871,55 @@ do
             end
 
             if ShowWeapon and Data.Weapon then
-                Renders.Weapon.Visible    = true
-                Renders.Weapon.Text       = Data.Weapon
-                Renders.Weapon.Position   = NewUDim2(0.5, 0, 1, 6)
+                Renders.Weapon.Visible  = true
+                Renders.Weapon.Text     = Data.Weapon
+                Renders.Weapon.Position = NewUDim2(0.5, 0, 1, 3)
                 Renders.Weapon.AnchorPoint = NewVector2(0.5, 0)
             else
                 Renders.Weapon.Visible = false
             end
 
             if ShowDistance then
-                Renders.Distance.Visible    = true
-                Renders.Distance.Text       = (Floor(Data.Distance * 10 + 0.5) / 10) .. "M"
-                Renders.Distance.Position   = Renders.Weapon.Visible and NewUDim2(0.5, 0, 1, 14) or NewUDim2(0.5, 0, 1, 6)
+                Renders.Distance.Visible   = true
+                Renders.Distance.Text      = (Floor(Data.Distance * 10 + 0.5) / 10) .. "M"
+                Renders.Distance.Position  = Renders.Weapon.Visible and NewUDim2(0.5, 0, 1, 14) or NewUDim2(0.5, 0, 1, 3)
                 Renders.Distance.AnchorPoint = NewVector2(0.5, 0)
             else
                 Renders.Distance.Visible = false
             end
 
             if ShowRank then
-                Renders.Rank.Visible     = true
-                Renders.Rank.Text        = Data.Rank
-                Renders.Rank.Position    = NewUDim2(1, 5, 0, -1)
+                Renders.Rank.Visible  = true
+                Renders.Rank.Text     = Data.Rank
+                Renders.Rank.Position = NewUDim2(1, 4, 0, 0)
                 Renders.Rank.AnchorPoint = NewVector2(0, 0)
             else
                 Renders.Rank.Visible = false
             end
 
+            -- FIX SKELETON: usa index do joint pra pegar os offsets corretos
             if ShowSkeleton then
                 local Joints = Data.Joints
                 for j = 1, #Joints do
-                    local PositionA = WTVP(PointToWorldSpace(Joints[j][1].CFrame, SkeletonOffsetsA[j]))
-                    local PositionB = WTVP(PointToWorldSpace(Joints[j][2].CFrame, SkeletonOffsetsB[j]))
+                    local JointData = Joints[j]
+                    local OrigIdx   = JointData[3]  -- index original no SkeletonJoints
+                    local PositionA = WTVP(PointToWorldSpace(JointData[1].CFrame, SkeletonOffsetsA[OrigIdx]))
+                    local PositionB = WTVP(PointToWorldSpace(JointData[2].CFrame, SkeletonOffsetsB[OrigIdx]))
                     local Center    = (NewVector2(PositionA.X,PositionA.Y) + NewVector2(PositionB.X,PositionB.Y)) / 2
                     local Offset    = NewVector2(PositionB.X,PositionB.Y) - NewVector2(PositionA.X,PositionA.Y)
+                    -- FIX: ignora linhas de comprimento 0 (same part)
+                    if Offset.Magnitude < 1 then
+                        Renders[j].Visible = false
+                        continue
+                    end
                     local Line      = Renders[j]
-                    Line.Position         = NewUDim2(0, Center.X, 0, Center.Y)
-                    Line.Size             = NewUDim2(0, Offset.Magnitude, 0, 1)
-                    Line.Rotation         = Deg(Atan2(Offset.Y, Offset.X))
+                    Line.Position        = NewUDim2(0, Center.X, 0, Center.Y)
+                    Line.Size            = NewUDim2(0, Offset.Magnitude, 0, 1)
+                    Line.Rotation        = Deg(Atan2(Offset.Y, Offset.X))
                     Line.BackgroundColor3 = (OverridePicker and OverridePicker.Color) or SkeletonColorpicker.Color
-                    Line.Transparency     = SkeletonColorpicker.Transparency
-                    Line.Visible          = true
+                    Line.Transparency    = SkeletonColorpicker.Transparency
+                    Line.Visible         = true
                 end
-                -- Esconde linhas extras se joints < 9
                 for j = #Joints + 1, 9 do Renders[j].Visible = false end
             else
                 for j = 1, 9 do Renders[j].Visible = false end
@@ -2089,6 +2062,271 @@ do
         end
     end
     Garbage = nil
+end
+
+-- ============================================================
+-- KEYBIND LIST WIDGET
+-- ============================================================
+-- Widget visual de keybinds no estilo da imagem 2:
+--   [KEYBINDS]
+--   Aim Assist   E   Holding
+--   Triggerbot   Q   Toggle
+--   ...
+-- Draggavel, toggle via checkbox no menu
+-- ============================================================
+local KeybindList = {}
+
+do
+    -- Container principal do widget
+    local KBWidget = NewInstance("Frame")
+    KBWidget.Name                = "KeybindList"
+    KBWidget.Parent              = gethui()
+    KBWidget.BackgroundColor3    = NewRGB(18, 18, 18)
+    KBWidget.BackgroundTransparency = 0.15
+    KBWidget.BorderSizePixel     = 0
+    KBWidget.Size                = NewUDim2(0, 190, 0, 24)
+    KBWidget.Position            = NewUDim2(0, 20, 0, 200)
+    KBWidget.Visible             = false
+    KBWidget.ZIndex              = 900
+    KBWidget.Active              = true
+    KBWidget.Selectable          = false
+    KBWidget.ClipsDescendants    = true
+
+    local KBCorner = NewInstance("UICorner")
+    KBCorner.CornerRadius = UDim.new(0, 4)
+    KBCorner.Parent       = KBWidget
+
+    local KBStroke = NewInstance("UIStroke")
+    KBStroke.Color       = NewRGB(60, 60, 60)
+    KBStroke.Transparency = 0
+    KBStroke.Thickness   = 1
+    KBStroke.Parent      = KBWidget
+
+    -- Header "keybinds"
+    local KBHeader = NewInstance("Frame")
+    KBHeader.Name             = "Header"
+    KBHeader.Parent           = KBWidget
+    KBHeader.BackgroundColor3 = NewRGB(12, 12, 12)
+    KBHeader.BackgroundTransparency = 0
+    KBHeader.BorderSizePixel  = 0
+    KBHeader.Size             = NewUDim2(1, 0, 0, 18)
+    KBHeader.Position         = NewUDim2(0, 0, 0, 0)
+    KBHeader.ZIndex           = 901
+
+    local KBHeaderCorner = NewInstance("UICorner")
+    KBHeaderCorner.CornerRadius = UDim.new(0, 4)
+    KBHeaderCorner.Parent       = KBHeader
+
+    -- Cobre a borda arredondada inferior do header
+    local KBHeaderPad = NewInstance("Frame")
+    KBHeaderPad.BackgroundColor3 = NewRGB(12, 12, 12)
+    KBHeaderPad.BackgroundTransparency = 0
+    KBHeaderPad.BorderSizePixel  = 0
+    KBHeaderPad.Size             = NewUDim2(1, 0, 0, 6)
+    KBHeaderPad.Position         = NewUDim2(0, 0, 1, -6)
+    KBHeaderPad.ZIndex           = 901
+    KBHeaderPad.Parent           = KBHeader
+
+    local KBTitle = NewInstance("TextLabel")
+    KBTitle.Parent               = KBHeader
+    KBTitle.BackgroundTransparency = 1
+    KBTitle.Size                 = NewUDim2(1, 0, 1, 0)
+    KBTitle.Text                 = "keybinds"
+    KBTitle.TextColor3           = NewRGB(200, 200, 200)
+    KBTitle.TextSize             = 11
+    KBTitle.Font                 = Enum.Font.GothamBold
+    KBTitle.TextXAlignment       = Enum.TextXAlignment.Center
+    KBTitle.ZIndex               = 902
+
+    -- Lista de rows
+    local KBList = NewInstance("Frame")
+    KBList.Name             = "List"
+    KBList.Parent           = KBWidget
+    KBList.BackgroundTransparency = 1
+    KBList.BorderSizePixel  = 0
+    KBList.Size             = NewUDim2(1, 0, 1, -18)
+    KBList.Position         = NewUDim2(0, 0, 0, 18)
+    KBList.ZIndex           = 901
+    KBList.ClipsDescendants = false
+
+    local KBListLayout = NewInstance("UIListLayout")
+    KBListLayout.Parent          = KBList
+    KBListLayout.FillDirection   = Enum.FillDirection.Vertical
+    KBListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    KBListLayout.VerticalAlignment   = Enum.VerticalAlignment.Top
+    KBListLayout.SortOrder       = Enum.SortOrder.LayoutOrder
+    KBListLayout.Padding         = UDim.new(0, 0)
+
+    -- Drag logic
+    local Dragging, DragStart, StartPos = false, nil, nil
+    KBHeader.InputBegan:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            Dragging  = true
+            DragStart = Input.Position
+            StartPos  = KBWidget.Position
+        end
+    end)
+    KBHeader.InputEnded:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            Dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(Input)
+        if Dragging and Input.UserInputType == Enum.UserInputType.MouseMovement then
+            local Delta = Input.Position - DragStart
+            KBWidget.Position = NewUDim2(
+                StartPos.X.Scale, StartPos.X.Offset + Delta.X,
+                StartPos.Y.Scale, StartPos.Y.Offset + Delta.Y
+            )
+        end
+    end)
+
+    -- Tabela de mapeamento: Flag -> nome amigavel
+    -- Registra os keybinds que queremos mostrar
+    local KBMapping = {
+        { FlagName = "legit aim assist enabled key",       DisplayName = "Aim Assist"   },
+        { FlagName = "legit trigger bot enabled key",      DisplayName = "Triggerbot"   },
+        { FlagName = "misc grenade helper hotkey",         DisplayName = "Grenade"      },
+        { FlagName = "esp players enabled",                DisplayName = "ESP"          },
+    }
+
+    -- Pool de rows UI
+    local KBRows = {}
+
+    local function GetOrCreateRow(Index)
+        if KBRows[Index] then return KBRows[Index] end
+
+        local Row = NewInstance("Frame")
+        Row.BackgroundTransparency = 1
+        Row.BorderSizePixel        = 0
+        Row.Size                   = NewUDim2(1, 0, 0, 16)
+        Row.LayoutOrder            = Index
+        Row.Parent                 = KBList
+        Row.ZIndex                 = 902
+
+        local NameLabel = NewInstance("TextLabel")
+        NameLabel.Name               = "NameLabel"
+        NameLabel.BackgroundTransparency = 1
+        NameLabel.Size               = NewUDim2(0.5, -4, 1, 0)
+        NameLabel.Position           = NewUDim2(0, 6, 0, 0)
+        NameLabel.TextColor3         = NewRGB(190, 190, 190)
+        NameLabel.TextSize           = 10
+        NameLabel.Font               = Enum.Font.Gotham
+        NameLabel.TextXAlignment     = Enum.TextXAlignment.Left
+        NameLabel.ZIndex             = 903
+        NameLabel.Parent             = Row
+
+        local KeyLabel = NewInstance("TextLabel")
+        KeyLabel.Name               = "KeyLabel"
+        KeyLabel.BackgroundTransparency = 1
+        KeyLabel.Size               = NewUDim2(0.25, 0, 1, 0)
+        KeyLabel.Position           = NewUDim2(0.5, 0, 0, 0)
+        KeyLabel.TextColor3         = NewRGB(150, 200, 60)   -- cor accent
+        KeyLabel.TextSize           = 10
+        KeyLabel.Font               = Enum.Font.GothamBold
+        KeyLabel.TextXAlignment     = Enum.TextXAlignment.Center
+        KeyLabel.ZIndex             = 903
+        KeyLabel.Parent             = Row
+
+        local ModeLabel = NewInstance("TextLabel")
+        ModeLabel.Name              = "ModeLabel"
+        ModeLabel.BackgroundTransparency = 1
+        ModeLabel.Size              = NewUDim2(0.25, -4, 1, 0)
+        ModeLabel.Position          = NewUDim2(0.75, 0, 0, 0)
+        ModeLabel.TextColor3        = NewRGB(130, 130, 130)
+        ModeLabel.TextSize          = 9
+        ModeLabel.Font              = Enum.Font.Gotham
+        ModeLabel.TextXAlignment    = Enum.TextXAlignment.Center
+        ModeLabel.ZIndex            = 903
+        ModeLabel.Parent            = Row
+
+        KBRows[Index] = {Frame = Row, Name = NameLabel, Key = KeyLabel, Mode = ModeLabel}
+        return KBRows[Index]
+    end
+
+    -- Converte enum key pra string legivel
+    local function KeyName(Key)
+        if not Key then return "?" end
+        local Name = tostring(Key)
+        Name = GSub(Name, "Enum.KeyCode.", "")
+        Name = GSub(Name, "Enum.UserInputType.", "")
+        -- Simplifica nomes comuns
+        local Short = {
+            LeftMouseButton = "LMB", RightMouseButton = "RMB",
+            MouseButton1 = "LMB", MouseButton2 = "RMB",
+            LeftShift = "LShift", RightShift = "RShift",
+            LeftControl = "LCtrl", RightControl = "RCtrl",
+            LeftAlt = "LAlt", RightAlt = "RAlt",
+        }
+        return Short[Name] or Name
+    end
+
+    -- Converte modo do hotkey pra texto curto
+    local function ModeName(Mode)
+        if not Mode then return "" end
+        local Short = {
+            ["Always on"]  = "Always",
+            ["On hotkey"]  = "Hold",
+            ["Toggle"]     = "Toggle",
+            ["Hold"]       = "Hold",
+        }
+        return Short[Mode] or Mode
+    end
+
+    -- Atualiza o widget com as keybinds ativas
+    local function UpdateKeybindWidget()
+        local ActiveCount = 0
+
+        for i, Entry in ipairs(KBMapping) do
+            local Flag = Flags[Entry.FlagName]
+            if not Flag then continue end
+
+            -- Detecta se tem key
+            local Key  = Flag.Key
+            local Mode = Flag.Mode or "Hold"
+
+            -- Pula se nao tem key configurada
+            if not Key then continue end
+
+            ActiveCount += 1
+            local Row = GetOrCreateRow(ActiveCount)
+            Row.Frame.Visible   = true
+            Row.Frame.LayoutOrder = ActiveCount
+            Row.Name.Text       = Entry.DisplayName
+            Row.Key.Text        = "[" .. KeyName(Key) .. "]"
+            Row.Mode.Text       = ModeName(Mode)
+        end
+
+        -- Esconde rows extras
+        for i = ActiveCount + 1, #KBRows do
+            KBRows[i].Frame.Visible = false
+        end
+
+        -- Atualiza tamanho do widget
+        local HeaderH  = 18
+        local RowH     = 16
+        local PadBot   = 4
+        local TotalH   = HeaderH + (ActiveCount * RowH) + PadBot
+        KBWidget.Size  = NewUDim2(0, 190, 0, Max(TotalH, 24))
+    end
+
+    -- Expoe API
+    KeybindList.Widget       = KBWidget
+    KeybindList.Update       = UpdateKeybindWidget
+    KeybindList.SetVisible   = function(V)
+        KBWidget.Visible = V
+        if V then UpdateKeybindWidget() end
+    end
+
+    -- Update periodico das keybinds (a cada 0.5s)
+    task.spawn(function()
+        while true do
+            Wait(0.5)
+            if KBWidget.Visible then
+                UpdateKeybindWidget()
+            end
+        end
+    end)
 end
 
 -- ============================================================
@@ -2284,11 +2522,26 @@ do
             Section:CreateToggle({Name = "Adjust for target movement", Flag = "misc grenade helper adjust for target movement"})
         end
 
+        -- SETTINGS SECTION — com Keybind List adicionado
         local Section = Menu.Window.Pages[5]:CreateSection({Name = "Settings", Side = 2, Length = 0.5}) do
             Section:CreateColorpicker({
                 Name = "Menu color", Flag = "menu color", Color = Menu.Theme["Accent"],
                 Callback = function(Color) Menu:ChangeThemeColor("Accent", Color) end
             })
+
+            -- ====================================================
+            -- KEYBIND LIST toggle — adicionado acima de Lock menu layout
+            -- ====================================================
+            Section:CreateToggle({
+                Name  = "Keybind list",
+                Flag  = "misc keybind list visible",
+                Value = false,
+                Callback = function(Enabled)
+                    KeybindList.SetVisible(Enabled)
+                end
+            })
+            -- ====================================================
+
             Section:CreateToggle({Name = "Lock menu layout"})
             Section:CreateButton({Name = "Reset menu layout", Confirm = true})
         end
